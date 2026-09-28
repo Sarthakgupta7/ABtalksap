@@ -54,9 +54,11 @@ const EMPTY: ProfileDossierSet = {
 };
 
 export async function buildProfileDossierSet(
-  opts?: { limit?: number },
+  opts?: { limit?: number; skills?: string[] },
 ): Promise<ProfileDossierSet> {
-  const rows = await listProfileCandidates(opts?.limit ?? 200);
+  const rows = await listProfileCandidates(opts?.limit ?? 200, {
+    skills: opts?.skills,
+  });
   if (rows.length === 0) return EMPTY;
 
   const [availability, unclaimed] = await Promise.all([

@@ -1586,203 +1586,140 @@ body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
 /* ============================================================
  * PARTICIPANT DESK  (dashboard)
  * ------------------------------------------------------------
- * Full-width workspace at /hackathon/dashboard. Compact top bar
- * (name + status + inline countdown), then a two-column grid:
- * primary column for the brief + submission, aside for the
- * guidelines and the schedule. Full-width registration strip at
- * the bottom.
+ * /hackathon/dashboard, inside the shared hackathon shell.
  *
- * NOT a shrunken clone of the landing hero — the CRT chrome is
- * limited to the top bar and shared card styles.
+ * The whole page is black. The landing's reel hero (same markup +
+ * classes) runs edge to edge across the content column; everything
+ * below sits flat on the page — full-bleed sections split by
+ * hairlines, with a label rail on the left on wide screens, never a
+ * stack of boxed cards. The registration pass closes the page: a
+ * black matte ticket on a white band.
+ *
+ * Monochrome: no yellow / pink / blue accents anywhere on the desk.
+ * The landing's hero rules read `--vt-yellow` / `--vt-pink` /
+ * `--vt-blue`, so the desk redefines them to neutrals and overrides
+ * the few hard-coded tints below. Only the red REC dot survives,
+ * exactly as on the landing.
  * ============================================================ */
+
+/* The shell's content area is white (it is on the landing). On the desk
+   it goes black, and drops its bottom padding so the white pass band
+   is what ends the page. */
+.ab-content:has(> .vt-desk) {
+  background: #0A0A0A;
+  padding-bottom: 0;
+}
 
 .vt-mono.vt-desk {
-  --vt-card-bg:       #0E0E0E;
-  --vt-card-bg-2:     #131313;
+  --vt-yellow:        #FFFFFF;
+  --vt-pink:          #8A8A8A;
+  --vt-blue:          #D4D4D4;
+
+  --vt-page:          #0A0A0A;
+  /* Schedule pips punch the rail line out with this colour. */
+  --vt-card-bg:       var(--vt-page);
   --vt-card-border:   rgba(255, 255, 255, 0.10);
-  --vt-card-border-2: rgba(255, 255, 255, 0.06);
   --vt-card-hair:     rgba(255, 255, 255, 0.10);
   --vt-text:          #FFFFFF;
-  --vt-muted:         rgba(255, 255, 255, 0.66);
-  --vt-dim:           rgba(255, 255, 255, 0.45);
+  --vt-muted:         rgba(255, 255, 255, 0.70);
+  --vt-dim:           rgba(255, 255, 255, 0.50);
 
+  /* Sections are full bleed; their content is capped at 1080px. */
+  --vt-gutter: max(clamp(20px, 4vw, 56px), calc((100% - 1080px) / 2));
+
+  display: block;
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: clamp(16px, 2.4vw, 32px);
-  display: grid;
-  gap: clamp(14px, 1.8vw, 22px);
-  background: transparent;
+  background: var(--vt-page);
+  color: var(--vt-text);
 }
 
 /* ============================================================
- * TOP BAR — welcome + countdown, all in one strip
+ * HERO — the landing's `.vt-hero` wholesale, but full bleed: no
+ * margin, no rounded card, no drop shadow, so the reels run the
+ * full height at the very edges of the content column.
  * ============================================================ */
-.vt-desk__bar {
-  position: relative;
-  overflow: hidden;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 24px;
-  padding: clamp(20px, 2.8vw, 32px) clamp(22px, 3vw, 36px);
-  border-radius: 18px;
+.vt-mono.vt-desk .vt-hero.hk-hero {
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.vt-mono.vt-desk .vt-hero__bg {
   background:
-    linear-gradient(180deg, #131313 0%, #0A0A0A 100%);
-  border: 1px solid var(--vt-card-border);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 22px 44px -24px rgba(0, 0, 0, 0.55);
-  color: var(--vt-text);
-}
-/* Very light raster to signal the CRT world without dominating. */
-.vt-desk__bar::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent 2px,
-    rgba(255, 255, 255, 0.022) 2px,
-    rgba(255, 255, 255, 0.022) 3px
-  );
-}
-.vt-desk__bar > * { position: relative; z-index: 1; }
-
-.vt-desk__bar-meta { display: grid; gap: 8px; min-width: 0; }
-.vt-desk__eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  font-family: ui-monospace, "SF Mono", "Consolas", monospace;
-  font-size: 11px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--vt-muted);
-}
-.vt-desk__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--vt-yellow, #FFE45C);
-  box-shadow: 0 0 8px rgba(255, 228, 92, 0.55);
-}
-.vt-desk__dot[data-tone="live"] {
-  background: #FF3B30;
-  box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.55);
-  animation: vt-rec 1.6s ease-in-out infinite;
-}
-.vt-desk__dot[data-tone="ended"] { background: rgba(255, 255, 255, 0.4); box-shadow: none; }
-
-.vt-desk__hi {
-  margin: 0;
-  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
-  font-size: clamp(28px, 3.6vw, 40px);
-  font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  color: var(--vt-text);
-}
-.vt-desk__hi-name { color: var(--vt-yellow, #FFE45C); }
-
-.vt-desk__status {
-  justify-self: start;
-  padding: 4px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 228, 92, 0.35);
-  background: rgba(255, 228, 92, 0.06);
-  color: var(--vt-yellow, #FFE45C);
-  font-family: ui-monospace, "SF Mono", "Consolas", monospace;
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-}
-.vt-desk__status[data-tone="live"] {
-  color: #FF6B61;
-  border-color: rgba(255, 59, 48, 0.4);
-  background: rgba(255, 59, 48, 0.08);
-}
-.vt-desk__status[data-tone="ended"] {
-  color: var(--vt-dim);
-  border-color: rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.04);
+    radial-gradient(1.5px 1.5px at 20px 20px, rgba(255, 255, 255, 0.18), transparent 60%),
+    radial-gradient(1.5px 1.5px at 60px 60px, rgba(255, 255, 255, 0.12), transparent 60%),
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.05), transparent 50%),
+    linear-gradient(180deg, #0F0F0F 0%, #0A0A0A 100%);
+  background-size: 80px 80px, 80px 80px, auto, auto;
+  background-position: 0 0, 40px 40px, center, center;
 }
 
-/* Countdown restyled for the top bar: transparent, no card of its own. */
-.vt-desk__bar-timer { justify-self: end; }
-.vt-mono .vt-desk__bar-timer .vt-count {
-  padding: 8px 10px;
-  background: rgba(0, 0, 0, 0.4);
-  border-color: rgba(255, 255, 255, 0.14);
-  gap: 8px;
+/* Status dot: red REC while the editing window is open (as on the
+   landing), steady white before kickoff, dimmed once wrapped. */
+.vt-mono.vt-desk .vt-hero__dot[data-tone="pre"] {
+  background: #FFFFFF;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.55);
+  animation: none;
 }
-.vt-mono .vt-desk__bar-timer .vt-count__tile {
-  min-width: 44px;
-  padding: 4px 8px 6px;
-  background: rgba(255, 255, 255, 0.03);
-  border-color: rgba(255, 255, 255, 0.08);
+.vt-mono.vt-desk .vt-hero__dot[data-tone="ended"] {
+  background: rgba(255, 255, 255, 0.4);
+  box-shadow: none;
+  animation: none;
 }
-.vt-mono .vt-desk__bar-timer .vt-count__num   { color: #FFFFFF; font-size: 22px; }
-.vt-mono .vt-desk__bar-timer .vt-count__label { color: var(--vt-dim); }
-.vt-mono .vt-desk__bar-timer .vt-count__phase { color: var(--vt-muted); }
 
-/* ============================================================
- * ROWS — the desk stacks rows, each row is either full-width
- * or a 2-col split. Heights always match within a row so we
- * never get the "one column dangling long" white gap.
- * ============================================================ */
-.vt-desk__row {
-  display: grid;
-  gap: clamp(14px, 1.8vw, 22px);
-  min-width: 0;
+/* Event-window pips: kickoff keeps the red REC pulse; the other two
+   were yellow / blue on the landing. */
+.vt-mono.vt-desk .vt-hero__meta > div:nth-child(2) dt::before {
+  background: #FFFFFF;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.45);
 }
-.vt-desk__row--split {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  align-items: stretch;
+.vt-mono.vt-desk .vt-hero__meta > div:nth-child(3) dt::before {
+  background: transparent;
+  border: 1.5px solid #FFFFFF;
+  box-shadow: none;
 }
-.vt-desk__row--split > * {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+
+/* The sidebar makes this hero narrower than the viewport, so the
+   landing's viewport breakpoints fire too late and the no-wrap event
+   panel overflows. Stack it by the content column (`.ab-content` is the
+   `content` container) instead. */
+.vt-mono.vt-desk .vt-hero__meta dd { white-space: normal; }
+@container content (max-width: 860px) {
+  .vt-mono.vt-desk .vt-hero__meta {
+    grid-template-columns: 1fr;
+    padding: 14px 20px;
+  }
+  .vt-mono.vt-desk .vt-hero__meta > div {
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+    padding: 12px 0;
+  }
+  .vt-mono.vt-desk .vt-hero__meta > div:first-child {
+    border-top: none;
+    padding-top: 4px;
+  }
 }
 
 /* ============================================================
- * CARDS  (used by every dashboard section)
+ * SECTIONS — `.vt-card--dark` keeps its name (the submission form
+ * renders it) but on the desk it is a flat, full-bleed band on the
+ * black page: hairline on top, no box, no radius, no shadow.
  * ============================================================ */
 .vt-mono .vt-card--dark {
   position: relative;
-  overflow: hidden;
-  padding: clamp(20px, 2.4vw, 28px);
-  border: 1px solid var(--vt-card-border);
-  border-radius: 16px;
-  background: var(--vt-card-bg);
+  padding: clamp(36px, 5vw, 64px) var(--vt-gutter);
+  border-top: 1px solid var(--vt-card-hair);
+  background: transparent;
   color: var(--vt-text);
-  box-shadow: 0 18px 40px -24px rgba(0, 0, 0, 0.55);
 }
-.vt-mono .vt-card--dark::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent 2px,
-    rgba(255, 255, 255, 0.02) 2px,
-    rgba(255, 255, 255, 0.02) 3px
-  );
-}
-.vt-mono .vt-card--dark > * { position: relative; }
 
 .vt-card__head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin: 0 0 16px;
+  gap: 8px 12px;
+  margin: 0 0 20px;
 }
 .vt-card__eyebrow {
   margin: 0;
@@ -1795,7 +1732,7 @@ body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
 .vt-card__tag {
   flex: 0 0 auto;
   padding: 4px 10px;
-  border: 1px solid var(--vt-card-border);
+  border: 1px solid rgba(255, 255, 255, 0.20);
   border-radius: 999px;
   font-family: ui-monospace, "SF Mono", "Consolas", monospace;
   font-size: 10px;
@@ -1803,23 +1740,50 @@ body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
   text-transform: uppercase;
   color: var(--vt-muted);
 }
-.vt-card__tag[data-tone="locked"] { color: var(--vt-yellow, #FFE45C); border-color: rgba(255, 228, 92, 0.38); }
-.vt-card__tag[data-tone="live"]   { color: #FF6B61;                 border-color: rgba(255, 59, 48, 0.42); }
-.vt-card__tag[data-tone="ended"]  { color: var(--vt-dim);           border-color: rgba(255, 255, 255, 0.14); }
-.vt-card__tag[data-tone="rules"]  { color: var(--vt-blue, #3CD1FF); border-color: rgba(60, 209, 255, 0.4); }
-.vt-card__tag[data-tone="info"]   { color: rgba(255, 255, 255, 0.75); border-color: rgba(255, 255, 255, 0.2); }
+/* Open / unlocked / saved — inverted white pill. */
+.vt-card__tag[data-tone="live"] {
+  color: #0A0A0A;
+  background: #FFFFFF;
+  border-color: #FFFFFF;
+  font-weight: 700;
+}
+.vt-card__tag[data-tone="locked"] { color: var(--vt-muted); border-style: dashed; border-color: rgba(255, 255, 255, 0.30); }
+.vt-card__tag[data-tone="ended"]  { color: var(--vt-dim);   border-color: rgba(255, 255, 255, 0.14); }
+.vt-card__tag[data-tone="info"]   { color: var(--vt-muted); border-color: rgba(255, 255, 255, 0.20); }
+
+/* Wide content column: section label becomes a left rail, content on
+   the right — an editorial layout rather than boxes. */
+@container content (min-width: 900px) {
+  .vt-mono.vt-desk .vt-card--dark {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    column-gap: clamp(32px, 5cqw, 72px);
+    align-items: start;
+  }
+  .vt-mono.vt-desk .vt-card--dark > * { grid-column: 2; }
+  .vt-mono.vt-desk .vt-card--dark > .vt-card__head {
+    grid-column: 1;
+    grid-row: 1 / span 8;
+    flex-direction: column;
+    align-items: flex-start;
+    margin: 0;
+    padding-top: 4px;
+  }
+}
 
 .vt-mono .vt-card__title {
   margin: 0 0 8px;
   font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
-  font-size: clamp(20px, 1.9vw, 24px);
+  font-size: clamp(22px, 2.2vw, 28px);
   font-weight: 700;
   line-height: 1.2;
+  letter-spacing: -0.01em;
   color: var(--vt-text);
 }
 .vt-mono .vt-card__body {
   margin: 0;
-  font-size: 14px;
+  max-width: 64ch;
+  font-size: 14.5px;
   line-height: 1.6;
   color: var(--vt-muted);
 }
@@ -1827,7 +1791,7 @@ body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-top: auto;
+  margin-top: 26px;
   padding-top: 18px;
   border-top: 1px solid var(--vt-card-hair);
   width: 100%;
@@ -1837,9 +1801,10 @@ body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
   text-transform: uppercase;
   color: var(--vt-text);
   text-decoration: none;
-  transition: gap 0.15s ease, color 0.15s ease;
+  transition: gap 0.15s ease;
 }
-.vt-mono .vt-card__link:hover { gap: 12px; color: var(--vt-yellow, #FFE45C); }
+.vt-mono .vt-card__link:hover { gap: 12px; }
+.vt-mono .vt-card__link:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 4px; }
 .vt-mono .vt-card__link svg {
   width: 14px;
   height: 14px;
@@ -1852,17 +1817,17 @@ body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
 }
 
 /* ============================================================
- * BRIEF  (locked / unlocked)
+ * PROBLEM STATEMENT  (locked / unlocked)
  * ============================================================ */
 .vt-brief__redacted {
   display: grid;
   gap: 10px;
-  margin: 0 0 22px;
+  margin: 0 0 24px;
 }
 .vt-brief__redacted span {
   display: block;
-  height: 16px;
-  border-radius: 4px;
+  height: 14px;
+  border-radius: 3px;
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0.06) 0%,
@@ -1888,22 +1853,27 @@ body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
-  border: 1px solid rgba(255, 228, 92, 0.36);
-  border-radius: 14px;
-  background: rgba(255, 228, 92, 0.06);
-  color: var(--vt-yellow, #FFE45C);
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  color: #FFFFFF;
+}
+.vt-brief.is-open .vt-brief__lock-icon {
+  background: #FFFFFF;
+  border-color: #FFFFFF;
+  color: #0A0A0A;
 }
 .vt-brief__lock-icon svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.vt-brief.is-open .vt-card__title { font-size: clamp(24px, 2.8vw, 34px); }
 .vt-brief__text {
   margin: 0;
   font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
@@ -1911,9 +1881,18 @@ body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
   line-height: 1.5;
   color: var(--vt-text);
 }
+/* The unlocked brief reads as a pull quote, not a box. */
+.vt-brief.is-open .vt-brief__text {
+  margin-top: 28px;
+  padding: 4px 0 4px 22px;
+  border-left: 3px solid #FFFFFF;
+  font-size: clamp(20px, 2.2vw, 28px);
+  line-height: 1.45;
+  white-space: pre-line;
+}
 
 /* ============================================================
- * GUIDELINES  (checklist, 2-col grid inside the card)
+ * GUIDELINES  (four numbered rules, 2 columns, hairline rows)
  * ============================================================ */
 .vt-guidelines {
   list-style: none;
@@ -1921,63 +1900,66 @@ body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
   padding: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  column-gap: clamp(24px, 3vw, 44px);
+  counter-reset: vt-rule;
 }
 .vt-guidelines li {
   position: relative;
-  padding: 14px 16px 14px 46px;
-  border: 1px solid var(--vt-card-border-2);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.025);
-  font-size: 13.5px;
+  counter-increment: vt-rule;
+  padding: 18px 0 18px 48px;
+  border-top: 1px solid var(--vt-card-hair);
+  font-size: 14px;
   line-height: 1.55;
   color: var(--vt-muted);
 }
 .vt-guidelines li strong {
+  display: block;
+  margin-bottom: 2px;
   color: var(--vt-text);
   font-weight: 600;
-  margin-right: 4px;
 }
 .vt-guidelines li::before {
-  content: "";
+  content: counter(vt-rule, decimal-leading-zero);
   position: absolute;
-  top: 16px;
-  left: 16px;
-  width: 18px;
-  height: 18px;
-  border: 1.5px solid var(--vt-blue, #3CD1FF);
+  top: 19px;
+  left: 0;
+  padding: 2px 5px;
   border-radius: 4px;
-  background:
-    linear-gradient(45deg, transparent 42%, var(--vt-blue, #3CD1FF) 44%, var(--vt-blue, #3CD1FF) 55%, transparent 57%) no-repeat 5px 6px / 10px 8px,
-    rgba(60, 209, 255, 0.08);
+  background: #FFFFFF;
+  color: #0A0A0A;
+  font-family: ui-monospace, "SF Mono", "Consolas", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
 }
 
 /* ============================================================
- * SCHEDULE  (horizontal rail, 4 stops in a row)
+ * SCHEDULE  (horizontal rail, 4 stops) — hollow = upcoming,
+ * filled = past, glowing white = next up.
  * ============================================================ */
 .vt-schedule--horizontal {
   list-style: none;
   margin: 0;
-  padding: 12px 8px 4px;
+  padding: 12px 0 4px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
   position: relative;
 }
-/* Track line running behind the pips. */
 .vt-schedule--horizontal::before {
   content: "";
   position: absolute;
   top: 20px;
-  left: 8%;
+  left: 0;
   right: 8%;
   height: 1px;
-  background: linear-gradient(to right, transparent 0%, var(--vt-card-hair) 6%, var(--vt-card-hair) 94%, transparent 100%);
+  background: linear-gradient(to right, var(--vt-card-hair) 0%, var(--vt-card-hair) 92%, transparent 100%);
 }
 .vt-schedule--horizontal li {
   display: grid;
   gap: 10px;
-  padding: 0 12px;
+  padding: 0 16px 0 0;
   justify-items: start;
   position: relative;
 }
@@ -1985,20 +1967,21 @@ body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
   width: 14px;
   height: 14px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: var(--vt-card-bg);
   box-shadow: 0 0 0 5px var(--vt-card-bg);
   z-index: 1;
   margin: 6px 0 0;
 }
-.vt-schedule--horizontal li.is-next .vt-schedule__pip {
-  background: var(--vt-yellow, #FFE45C);
-  box-shadow: 0 0 0 5px var(--vt-card-bg), 0 0 14px rgba(255, 228, 92, 0.7);
+.vt-schedule--horizontal li.is-past .vt-schedule__pip {
+  border-color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.55);
 }
-.vt-schedule--horizontal li.is-past .vt-schedule__pip { background: rgba(255, 255, 255, 0.55); }
-.vt-schedule__pip[data-tone="kickoff"]  { background: #FF3B30; }
-.vt-schedule__pip[data-tone="deadline"] { background: var(--vt-yellow, #FFE45C); }
-.vt-schedule__pip[data-tone="results"]  { background: var(--vt-blue, #3CD1FF); }
-.vt-schedule__pip[data-tone="mid"]      { background: rgba(255, 255, 255, 0.3); }
+.vt-schedule--horizontal li.is-next .vt-schedule__pip {
+  border-color: #FFFFFF;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 5px var(--vt-card-bg), 0 0 14px rgba(255, 255, 255, 0.6);
+}
 .vt-schedule__label {
   margin: 0;
   font-family: ui-monospace, "SF Mono", "Consolas", monospace;
@@ -2009,7 +1992,7 @@ body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
 }
 .vt-schedule__value {
   margin: 3px 0 0;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--vt-text);
   line-height: 1.35;
@@ -2021,55 +2004,163 @@ body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
 }
 
 /* ============================================================
- * REGISTRATION FOOTER  (3-column strip, full width)
+ * REGISTRATION PASS — a black matte ticket on a white band.
+ * Main panel + tear-off stub split by a perforated edge with two
+ * punched notches. The notches are cut with a CSS mask, so they show
+ * the white band behind; the drop shadow lives on the wrapper (a
+ * `filter` follows the masked shape, a box-shadow would be clipped).
  * ============================================================ */
-.vt-registration__grid {
+.vt-pass {
+  padding: clamp(44px, 6vw, 88px) var(--vt-gutter);
+  background: #FFFFFF;
+}
+.vt-pass__inner {
+  filter:
+    drop-shadow(0 26px 30px rgba(0, 0, 0, 0.20))
+    drop-shadow(0 3px 6px rgba(0, 0, 0, 0.14));
+}
+
+.vt-ticket {
+  --vt-stub-w: 200px;
+  --vt-stub-h: 96px;
+  --vt-notch: 14px;
+  --vt-cut-x: calc(100% - var(--vt-stub-w));
+
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  column-gap: 24px;
-  row-gap: 16px;
-  margin: 0;
+  grid-template-columns: minmax(0, 1fr) var(--vt-stub-w);
+  border-radius: 18px;
+  color: #FFFFFF;
+  /* Matte: charcoal-to-black greyscale gradient, a soft light pool in
+     the top-left corner, and a fine grain on top so it never reads as
+     glossy. */
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.07 0'/></filter><rect width='160' height='160' filter='url(%23g)'/></svg>"),
+    radial-gradient(120% 140% at 0% 0%, rgba(255, 255, 255, 0.10) 0%, transparent 55%),
+    linear-gradient(135deg, #3A3A3A 0%, #262626 34%, #181818 68%, #0E0E0E 100%);
+  background-size: 160px 160px, auto, auto;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  -webkit-mask:
+    radial-gradient(circle var(--vt-notch) at var(--vt-cut-x) 0, #0000 98%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle var(--vt-notch) at var(--vt-cut-x) 100%, #0000 98%, #000) bottom / 100% 51% no-repeat;
+  mask:
+    radial-gradient(circle var(--vt-notch) at var(--vt-cut-x) 0, #0000 98%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle var(--vt-notch) at var(--vt-cut-x) 100%, #0000 98%, #000) bottom / 100% 51% no-repeat;
 }
-.vt-registration__grid > div {
-  padding: 12px 16px;
-  border-left: 1px solid var(--vt-card-hair);
+.vt-ticket .vt-card__head { margin-bottom: 16px; }
+.vt-ticket .vt-card__eyebrow { color: rgba(255, 255, 255, 0.62); }
+.vt-ticket .vt-card__tag { color: rgba(255, 255, 255, 0.70); border-color: rgba(255, 255, 255, 0.24); }
+.vt-ticket__main {
   min-width: 0;
+  padding: clamp(22px, 2.6vw, 32px);
 }
-.vt-registration__grid > div:first-child,
-.vt-registration__grid > div:nth-child(4) { border-left: none; padding-left: 0; }
-.vt-registration__grid dt {
+.vt-ticket__title {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(26px, 2.8vw, 34px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.vt-ticket__title-sub {
+  font-family: ui-monospace, "SF Mono", "Consolas", monospace;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.vt-ticket__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px 24px;
+  margin: 22px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.vt-ticket__grid > div { min-width: 0; }
+.vt-ticket__grid dt {
   margin: 0 0 6px;
   font-family: ui-monospace, "SF Mono", "Consolas", monospace;
   font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--vt-dim);
+  color: rgba(255, 255, 255, 0.55);
 }
-.vt-registration__grid dd {
+.vt-ticket__grid dd {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: var(--vt-text);
-  overflow-wrap: anywhere;
   line-height: 1.4;
+  color: #FFFFFF;
+  overflow-wrap: anywhere;
 }
-.vt-registration__link {
-  color: var(--vt-blue, #3CD1FF);
+.vt-ticket__link {
+  color: #FFFFFF;
   text-decoration: none;
-  border-bottom: 1px solid rgba(60, 209, 255, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
   transition: border-color 0.15s ease;
 }
-.vt-registration__link:hover { border-color: var(--vt-blue, #3CD1FF); }
+.vt-ticket__link:hover { border-color: #FFFFFF; }
+
+.vt-ticket__stub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 26px 20px;
+  border-left: 2px dashed rgba(255, 255, 255, 0.26);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 100%);
+  text-align: center;
+}
+.vt-ticket__stub-label {
+  margin: 0;
+  font-family: ui-monospace, "SF Mono", "Consolas", monospace;
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.vt-ticket__stub-big {
+  margin: 2px 0 6px;
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: #FFFFFF;
+}
+/* Decorative barcode strip — uneven bars from one repeating gradient. */
+.vt-ticket__barcode {
+  display: block;
+  width: 100%;
+  max-width: 150px;
+  height: 44px;
+  opacity: 0.8;
+  background: repeating-linear-gradient(
+    90deg,
+    #FFFFFF 0 2px, transparent 2px 4px,
+    #FFFFFF 4px 5px, transparent 5px 8px,
+    #FFFFFF 8px 11px, transparent 11px 12px,
+    #FFFFFF 12px 13px, transparent 13px 16px
+  );
+}
 
 /* ============================================================
- * SUBMISSION FORM inside a dark card (overrides light styles)
+ * SUBMISSION FORM on the black page (overrides light styles)
  * ============================================================ */
 .vt-mono .vt-card--dark .vt-field__label { color: var(--vt-muted); }
 .vt-mono .vt-card--dark .vt-field__hint  { color: var(--vt-dim); }
 .vt-mono .vt-card--dark .vt-field__input,
 .vt-mono .vt-card--dark .vt-field__textarea {
   background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.16);
   color: var(--vt-text);
   font-size: 15px;
   padding: 12px 14px;
@@ -2080,17 +2171,15 @@ body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
 }
 .vt-mono .vt-card--dark .vt-field__input:focus,
 .vt-mono .vt-card--dark .vt-field__textarea:focus {
-  border-color: var(--vt-yellow, #FFE45C);
-  box-shadow: 0 0 0 3px rgba(255, 228, 92, 0.12);
+  border-color: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.14);
 }
 .vt-mono .vt-card--dark .vt-field__error { color: #FF6B61; }
-.vt-mono .vt-card--dark .vt-panel__stack { display: grid; gap: 16px; margin-top: 20px; }
+.vt-mono .vt-card--dark .vt-panel__stack { display: grid; gap: 16px; margin-top: 22px; }
 .vt-mono .vt-card--dark .vt-panel__actions {
   display: flex;
   gap: 12px;
   margin-top: 22px;
-  padding-top: 20px;
-  border-top: 1px solid var(--vt-card-hair);
 }
 .vt-mono .vt-card--dark .vt-panel__meta { color: var(--vt-dim); margin-top: 12px; }
 .vt-mono .vt-card--dark .vt-btn--primary {
@@ -2112,53 +2201,61 @@ body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
 .vt-mono .vt-card--dark .vt-row__label { color: var(--vt-dim); }
 .vt-mono .vt-card--dark .vt-row__value { color: var(--vt-text); }
 .vt-mono .vt-card--dark .vt-row__link {
-  color: var(--vt-blue, #3CD1FF);
+  color: var(--vt-text);
   text-decoration: none;
-  border-bottom: 1px solid rgba(60, 209, 255, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
 }
 
 /* ============================================================
  * RESPONSIVE
  * ============================================================ */
-@media (max-width: 960px) {
-  .vt-desk__row--split { grid-template-columns: 1fr; }
-  .vt-desk__row--split > * { height: auto; }
+/* Grids follow the content column (sidebar-aware), not the viewport. */
+@container content (max-width: 860px) {
+  .vt-ticket__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container content (max-width: 640px) {
   .vt-guidelines { grid-template-columns: 1fr; }
-  .vt-registration__grid { grid-template-columns: repeat(2, 1fr); }
-  .vt-registration__grid > div:nth-child(4) { border-left: 1px solid var(--vt-card-hair); padding-left: 16px; }
-  .vt-registration__grid > div:nth-child(3),
-  .vt-registration__grid > div:nth-child(5) { border-left: none; padding-left: 0; }
 }
 @media (max-width: 720px) {
-  .vt-desk__bar { grid-template-columns: 1fr; }
-  .vt-desk__bar-timer { justify-self: start; }
   .vt-schedule--horizontal { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 12px; padding: 8px 0 4px; }
   .vt-schedule--horizontal::before { display: none; }
 }
 @media (max-width: 640px) {
-  .vt-mono.vt-desk { padding: 14px; }
-  .vt-mono .vt-card--dark { padding: 18px; }
-  .vt-desk__bar { padding: 20px; border-radius: 14px; }
-  .vt-desk__hi { font-size: clamp(24px, 7vw, 30px); }
-  .vt-mono .vt-desk__bar-timer .vt-count { padding: 6px 8px; gap: 5px; }
-  .vt-mono .vt-desk__bar-timer .vt-count__phase { display: none; }
-  .vt-mono .vt-desk__bar-timer .vt-count__tile { min-width: 40px; padding: 3px 5px 5px; }
-  .vt-mono .vt-desk__bar-timer .vt-count__num { font-size: 18px; }
-  .vt-mono .vt-desk__bar-timer .vt-count__label { font-size: 8px; letter-spacing: 0.14em; }
-  .vt-registration__grid { grid-template-columns: 1fr; }
-  .vt-registration__grid > div { border-left: none; border-top: 1px solid var(--vt-card-hair); padding: 12px 0; }
-  .vt-registration__grid > div:first-child { border-top: none; padding-top: 0; }
+  .vt-mono .vt-card--dark { padding-block: 32px; }
   .vt-brief__lock { gap: 14px; }
-  .vt-brief__lock-icon { width: 44px; height: 44px; }
+  .vt-brief__lock-icon { width: 42px; height: 42px; }
   .vt-brief__text { font-size: 17px; }
   .vt-mono .vt-card--dark .vt-panel__actions { flex-direction: column; }
   .vt-mono .vt-card--dark .vt-btn--primary { width: 100%; }
+
+  /* Pass stacks: stub drops below the main panel, perforation turns
+     horizontal and the notches move to the left / right edges. */
+  .vt-ticket {
+    --vt-cut-y: calc(100% - var(--vt-stub-h));
+    grid-template-columns: minmax(0, 1fr);
+    -webkit-mask:
+      radial-gradient(circle var(--vt-notch) at 0 var(--vt-cut-y), #0000 98%, #000) left / 51% 100% no-repeat,
+      radial-gradient(circle var(--vt-notch) at 100% var(--vt-cut-y), #0000 98%, #000) right / 51% 100% no-repeat;
+    mask:
+      radial-gradient(circle var(--vt-notch) at 0 var(--vt-cut-y), #0000 98%, #000) left / 51% 100% no-repeat,
+      radial-gradient(circle var(--vt-notch) at 100% var(--vt-cut-y), #0000 98%, #000) right / 51% 100% no-repeat;
+  }
+  .vt-ticket__main { padding: 20px; }
+  .vt-ticket__stub {
+    height: var(--vt-stub-h);
+    flex-direction: row;
+    padding: 0 22px;
+    border-left: none;
+    border-top: 2px dashed rgba(255, 255, 255, 0.26);
+    text-align: left;
+  }
+  .vt-ticket__stub > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; }
+  .vt-ticket__stub-big { font-size: 26px; margin: 0; }
+  .vt-ticket__stub-label:last-child { flex-basis: 100%; margin-top: 4px; }
+  .vt-ticket__barcode { width: 110px; height: 40px; flex: 0 0 auto; }
 }
 @media (max-width: 480px) {
-  .vt-desk__eyebrow { font-size: 10px; letter-spacing: 0.18em; }
-  .vt-desk__status { font-size: 9.5px; letter-spacing: 0.16em; }
-  .vt-mono .vt-card__title { font-size: 18px; }
-  .vt-guidelines li { padding: 12px 12px 12px 40px; font-size: 13px; }
+  .vt-guidelines li { padding-left: 44px; font-size: 13.5px; }
   .vt-schedule--horizontal { grid-template-columns: 1fr; }
+  .vt-ticket__grid { grid-template-columns: 1fr; gap: 14px; }
 }
-

@@ -78,7 +78,7 @@ export function VideoSubmissionForm({ initial, editable, closed }: Props) {
       <section className="vt-card vt-card--dark is-locked">
         <header className="vt-card__head">
           <p className="vt-card__eyebrow">Scene 02 · Your cut</p>
-          <span className="vt-card__tag" data-tone="locked">Locked</span>
+         
         </header>
         <div className="vt-brief__lock">
           <span className="vt-brief__lock-icon" aria-hidden>

@@ -20,6 +20,20 @@ type ActionResult = { ok: true } | { ok: false; message: string };
 
 const PHONE_TAKEN_MESSAGE = "This number is already linked to another account.";
 
+/**
+ * Team test number. For this ONE number only: no SMS is sent, the fixed code
+ * below verifies, and the one-number-per-account rule is skipped so any
+ * number of test accounts can use it. Every other number is unaffected.
+ * Server-only (this is a "use server" module) — never shipped to the browser.
+ * Remove these two constants to switch the bypass off.
+ */
+const TEAM_TEST_PHONE_E164 = "+917081441088";
+const TEAM_TEST_OTP = "3103";
+
+function isTeamTestPhone(e164: string): boolean {
+  return e164 === TEAM_TEST_PHONE_E164;
+}
+
 const phoneCheckSchema = z.object({
   countryCode: z.literal(INDIA_DIALING_CODE),
   phoneNumber: indianMobileNumberSchema,
@@ -51,7 +65,10 @@ async function isPhoneTakenByOther(
 export async function checkPhoneAvailableAction(input: {
   countryCode: string;
   phoneNumber: string;
-}): Promise<ActionResult> {
+}): Promise<
+  | { ok: true; testNumber?: boolean }
+  | { ok: false; message: string }
+> {
   const session = await auth();
   if (!session?.user?.id) {
     return { ok: false, message: "Not authenticated" };
@@ -64,6 +81,11 @@ export async function checkPhoneAvailableAction(input: {
   }
 
   const e164 = toE164(parsed.data.countryCode, parsed.data.phoneNumber);
+  // Team test number: tell the client to skip the SMS widget and show the
+  // code box. No availability check — it is shared across test accounts.
+  if (isTeamTestPhone(e164)) {
+    return { ok: true, testNumber: true };
+  }
   try {
     if (await isPhoneTakenByOther(writeClient(), e164, userId)) {
       logger.warn("[otp] send blocked: number verified on another account", { userId });
@@ -109,8 +131,13 @@ export async function verifyOtpAction(input: {
   const { countryCode, phoneNumber, accessToken, otp } = parsed.data;
   const e164 = toE164(countryCode, phoneNumber);
   const widgetMobile = toWidgetMobile(e164);
+  const teamTestPhone = isTeamTestPhone(e164);
 
-  if (isOtpDevBypassEnabled()) {
+  if (teamTestPhone) {
+    if (otp !== TEAM_TEST_OTP) {
+      return { ok: false, message: "Invalid code." };
+    }
+  } else if (isOtpDevBypassEnabled()) {
     if (otp !== otpDevCode()) {
       return { ok: false, message: "Invalid code." };
     }
@@ -135,7 +162,9 @@ export async function verifyOtpAction(input: {
     const claimed = await writeClient().$transaction(async (tx) => {
       // Re-checked here (not just at send time) so a claim that lands between
       // Send OTP and Verify still loses.
-      if (await isPhoneTakenByOther(tx, e164, userId)) return false;
+      if (!teamTestPhone && (await isPhoneTakenByOther(tx, e164, userId))) {
+        return false;
+      }
 
       await tx.phoneVerification.upsert({
         where: { userId },

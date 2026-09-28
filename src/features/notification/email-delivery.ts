@@ -65,9 +65,15 @@ export async function processEmailDelivery(
 
   const result = await sendEmail({
     to: notification.recipient.email,
+    toName: notification.recipient.name ?? undefined,
     subject,
     html,
     text,
+    // Every UserNotification is addressed to one person about their own
+    // activity — transactional, not a mailing. Dropping `Precedence: bulk`
+    // keeps it out of Gmail's Promotions tab.
+    bulk: false,
+    kind: notification.eventType,
   });
 
   if (result.ok) {

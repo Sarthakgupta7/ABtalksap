@@ -15,6 +15,8 @@ export function VideothonExportButton({ rows }: { rows: AdminVideoRegistration[]
     const csv = toCSV(
       rows.map((r) => ({
         fullName: r.fullName,
+        userType: r.isNewUser ? "NEW" : "OLD",
+        accountCreatedAt: r.accountCreatedAtIso,
         email: r.email,
         phone: r.phone,
         city: r.city,

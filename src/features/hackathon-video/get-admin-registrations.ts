@@ -18,6 +18,10 @@ export type AdminVideoRegistration = {
   submissionNotes: string | null;
   submissionUpdatedAtIso: string | null;
   createdAtIso: string;
+  /** When the ABTalks account itself was created. */
+  accountCreatedAtIso: string;
+  /** True when the account was created for VideoThon (see NEW_USER_WINDOW_MS). */
+  isNewUser: boolean;
 };
 
 export type AdminVideoRegistrationsData = {
@@ -25,8 +29,29 @@ export type AdminVideoRegistrationsData = {
   learnerCount: number;
   workingCount: number;
   submittedCount: number;
+  newUserCount: number;
+  existingUserCount: number;
   rows: AdminVideoRegistration[];
 };
+
+export type VideoRegistrationUserType = "all" | "old" | "new";
+
+/**
+ * A registrant counts as NEW when their ABTalks account was created at most
+ * this long before they registered for VideoThon — i.e. they signed up in
+ * order to join. There is no last-login column, so account age at
+ * registration time is the signal. Anyone whose account is older is OLD.
+ */
+const NEW_USER_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+function isNewUser(accountCreatedAt: Date, registeredAt: Date): boolean {
+  return registeredAt.getTime() - accountCreatedAt.getTime() <= NEW_USER_WINDOW_MS;
+}
+
+/** Normalises the `?cohort=` search param (same param as the code-hackathon page). */
+export function parseVideoRegistrationUserType(raw: unknown): VideoRegistrationUserType {
+  return raw === "old" || raw === "new" ? raw : "all";
+}
 
 const querySchema = z.string().trim().max(120).optional();
 
@@ -42,8 +67,10 @@ export function parseVideoRegistrationQuery(raw: unknown): string | undefined {
  */
 export async function getAdminVideoRegistrations({
   q,
+  userType = "all",
 }: {
   q?: string;
+  userType?: VideoRegistrationUserType;
 }): Promise<AdminVideoRegistrationsData> {
   const eventWhere = { eventId: VIDEOTHON.eventId };
   const rowsWhere = q
@@ -58,7 +85,7 @@ export async function getAdminVideoRegistrations({
       }
     : eventWhere;
 
-  const [rows, total, working, submitted] = await Promise.all([
+  const [rows, total, working, submitted, accountAges] = await Promise.all([
     prisma.hackathonVideoRegistration.findMany({
       where: rowsWhere,
       orderBy: { createdAt: "desc" },
@@ -78,6 +105,7 @@ export async function getAdminVideoRegistrations({
         submissionNotes: true,
         submissionUpdatedAt: true,
         createdAt: true,
+        user: { select: { createdAt: true } },
       },
     }),
     prisma.hackathonVideoRegistration.count({ where: eventWhere }),
@@ -87,14 +115,35 @@ export async function getAdminVideoRegistrations({
     prisma.hackathonVideoRegistration.count({
       where: { ...eventWhere, submissionUrl: { not: null } },
     }),
+    // New vs old compares two columns across tables, which Prisma cannot
+    // express in `where` — so the split is computed here over the event.
+    prisma.hackathonVideoRegistration.findMany({
+      where: eventWhere,
+      select: { createdAt: true, user: { select: { createdAt: true } } },
+    }),
   ]);
+
+  const newUserCount = accountAges.filter((r) =>
+    isNewUser(r.user.createdAt, r.createdAt),
+  ).length;
+
+  const mapped = rows.map((r) => {
+    const rowIsNew = isNewUser(r.user.createdAt, r.createdAt);
+    return { r, rowIsNew };
+  });
+  const visible =
+    userType === "all"
+      ? mapped
+      : mapped.filter(({ rowIsNew }) => (userType === "new" ? rowIsNew : !rowIsNew));
 
   return {
     total,
     learnerCount: total - working,
     workingCount: working,
     submittedCount: submitted,
-    rows: rows.map((r) => ({
+    newUserCount,
+    existingUserCount: total - newUserCount,
+    rows: visible.map(({ r, rowIsNew }) => ({
       id: r.id,
       userId: r.userId,
       fullName: r.fullName,
@@ -109,6 +158,8 @@ export async function getAdminVideoRegistrations({
       submissionNotes: r.submissionNotes,
       submissionUpdatedAtIso: r.submissionUpdatedAt?.toISOString() ?? null,
       createdAtIso: r.createdAt.toISOString(),
+      accountCreatedAtIso: r.user.createdAt.toISOString(),
+      isNewUser: rowIsNew,
     })),
   };
 }

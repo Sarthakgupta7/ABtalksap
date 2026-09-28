@@ -32,6 +32,7 @@
     "db:seed:powerbi": "tsx prisma/seed-powerbi.ts",
     "db:seed:snowflake": "tsx prisma/seed-snowflake.ts",
     "db:seed:databricks-ai": "tsx prisma/seed-databricks-ai.ts",
+    "db:seed:langchain": "tsx prisma/seed-langchain.ts",
     "db:cleanup": "tsx prisma/cleanup.ts test",
     "db:cleanup:test": "tsx prisma/cleanup.ts test",
     "db:cleanup:real": "tsx prisma/cleanup.ts real",

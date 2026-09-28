@@ -69,6 +69,7 @@ export type HubSearchIndexInput = {
   hasPowerBiAccess: boolean;
   hasSnowflakeAccess: boolean;
   hasDatabricksAiAccess: boolean;
+  hasLangchainAccess: boolean;
   isAdmin: boolean;
   claudeEnabled: boolean;
   programEnabled: boolean;
@@ -298,6 +299,18 @@ export function buildHubSearchIndex(input: HubSearchIndexInput): HubSearchItem[]
       href: "/program/databricks-ai",
       keywords:
         "prep kit databricks data engineering lakeflow unity catalog mlflow mosaic ai genie 15 days",
+    });
+  }
+
+  if (input.hasLangchainAccess) {
+    items.push({
+      id: "prep:langchain",
+      group: "Prep Kit",
+      title: "LangChain & LangGraph Cohort",
+      subtitle: "Go from your first LLM call to a deployed LangGraph agent in 31 days.",
+      href: "/program/langchain",
+      keywords:
+        "prep kit langchain langgraph llm rag agents agentic ai langsmith mcp generative ai 31 days",
     });
   }
 

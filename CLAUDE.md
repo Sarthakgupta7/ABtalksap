@@ -18,6 +18,7 @@ Read it before planning anything non-trivial. (Intentionally not auto-imported
 here, to keep this file lean.)
 
 ## Non-negotiable rules (always apply)
+- **CODEOWNERS requirement**: Every module owner must append and maintain their owned file paths in `.github/CODEOWNERS` with their GitHub handle (`@username`). Any developer proposing changes to an owned domain must refer to and get review/approval from that owner first.
 - Edge-safe middleware: `middleware.ts` and anything it imports use ONLY
   `next-auth` and `next/server`. NO `@/lib/*` imports — they blow the 1 MB Edge
   bundle limit.
@@ -216,16 +217,16 @@ Shivansh:
 - Assessment Builder
 - Career guidance
 
-Zainab:
-- Recruiter registration
-- Recruiter profile
+Zainab (@zainabshujat):
+- Resume Parsing & Import (`/admin/resume-imports`, `features/resume`, `resume-import` repo & actions)
+- Hire side & Recruiter (`/hire`, `/admin/hire`, `features/hire`, `features/recruiter*`, recruiter onboarding & seats)
 - Company identity
 - Credits
 - Credit ledger
 - Contact unlock
 - Plans / limits
 - Outreach
-- Mock Interviews
+- Mock Interviews (`/mock-interviews`, `/interview`, `features/interview`, mock interview actions)
 
 Shashank:
 - Talent projects
@@ -320,3 +321,5 @@ SECURITY IMPACT:
 TESTS RUN:
 MANUAL TEST STEPS:
 KNOWN RISKS:
+
+13. **Maintain CODEOWNERS**: Every module owner MUST append and maintain their owned directories and files in `.github/CODEOWNERS` with their GitHub handle (`@username`). Any PR that modifies files in an owned domain will automatically require review and sign-off from that code owner before merging.

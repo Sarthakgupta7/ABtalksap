@@ -1112,6 +1112,15 @@
 .vt-dialog__sub { font-size: 13px; color: #626262; }
 .vt-dialog__body { padding-top: 10px; }
 
+/* Dropdowns inside the register dialog (country code, state, city
+   suggestions). `ui/dialog` sits at z-index 200, but Select and Autocomplete
+   portal their positioner to <body> at z-50, so the lists opened BEHIND the
+   dialog and looked dead. While this dialog is open, lift any Base UI
+   positioner (role="presentation") that holds a listbox above it. */
+body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
+  z-index: 300;
+}
+
 .vt-form { display: grid; gap: 16px; }
 .vt-form__identity {
   display: grid;

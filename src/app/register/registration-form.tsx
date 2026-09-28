@@ -189,9 +189,9 @@ export function RegistrationForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
-      <p className="text-xs text-muted-foreground">
+      {/* <p className="text-xs text-muted-foreground">
         Fields marked <span className="text-destructive">*</span> are required.
-      </p>
+      </p> */}
 
       <div className="grid gap-6 sm:grid-cols-2 sm:gap-4">
         <div className="space-y-2">

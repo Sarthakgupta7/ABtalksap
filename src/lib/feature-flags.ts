@@ -61,6 +61,15 @@ export function isDatabricksAiEnabled(): boolean {
 }
 
 /**
+ * LangChain & LangGraph cohort at /program/langchain.
+ * Unset/false 404s the route and hides the Prep Kit card.
+ * Set to true in Vercel to launch.
+ */
+export function isLangchainEnabled(): boolean {
+  return process.env.ENABLE_LANGCHAIN === "true";
+}
+
+/**
  * Entry assessment quiz is removed from the program cohort product surface.
  * Apply enrolls/waitlists directly. Kept as a always-on flag for call sites.
  */

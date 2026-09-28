@@ -4,6 +4,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { isEmailLoginEnabled } from "@/lib/feature-flags";
 import { requireRecruiter } from "@/lib/program-auth";
 import { cn } from "@/lib/utils";
+import { isCompanyLogoStorageConfigured } from "@/features/hire/org-logo-storage";
 import { getRecruiterProfileAction } from "@/app/actions/recruiter-profile-actions";
 import { RecruiterProfileForm } from "@/components/hire/recruiter-profile-form";
 
@@ -54,7 +55,10 @@ export default async function HireSettingsPage() {
         </p>
       </div>
 
-      <RecruiterProfileForm initialData={res.data} />
+      <RecruiterProfileForm
+        initialData={res.data}
+        logoUploadAvailable={isCompanyLogoStorageConfigured()}
+      />
 
       {isEmailLoginEnabled() ? (
         <section className="rounded-xl border bg-card p-5">

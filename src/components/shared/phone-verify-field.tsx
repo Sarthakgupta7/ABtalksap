@@ -174,6 +174,12 @@ type Props = {
   placeholder?: string;
   /** Extra classes for the country select, number input and Send OTP button (e.g. a shared height). */
   controlClassName?: string;
+  /** Overrides the dialing-code list. Values must be unique; +91 is still the only one that needs OTP. */
+  countryOptions?: { code: string; label: string }[];
+  /** Overrides the field label. */
+  label?: string;
+  /** Overrides the hint shown when no OTP is needed; null hides it. */
+  optionalHint?: string | null;
 };
 
 export function PhoneVerifyField({
@@ -187,6 +193,9 @@ export function PhoneVerifyField({
   required = false,
   placeholder,
   controlClassName,
+  countryOptions = COUNTRY_CODES,
+  label = "Phone Number",
+  optionalHint = "Optional. Visible to admins only.",
 }: Props) {
   const [countryCode, setCountryCode] = useState(defaultCountryCode);
   const [phoneNumber, setPhoneNumber] = useState(defaultPhoneNumber);
@@ -358,7 +367,7 @@ export function PhoneVerifyField({
   return (
     <div className="space-y-3">
       <Label htmlFor="phoneNumber">
-        Phone Number
+        {label}
         {required ? (
           <span className="-ml-1.5 text-destructive" aria-hidden>
             *
@@ -378,7 +387,7 @@ export function PhoneVerifyField({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {COUNTRY_CODES.map((c) => (
+            {countryOptions.map((c) => (
               <SelectItem key={c.code} value={c.code}>
                 {c.label}
               </SelectItem>
@@ -474,10 +483,10 @@ export function PhoneVerifyField({
         </div>
       ) : null}
 
-      {(!verificationRequired || !isIndia) && !(required && isIndia) ? (
-        <p className="text-xs text-muted-foreground">
-          Optional. Visible to admins only.
-        </p>
+      {optionalHint !== null &&
+      (!verificationRequired || !isIndia) &&
+      !(required && isIndia) ? (
+        <p className="text-xs text-muted-foreground">{optionalHint}</p>
       ) : null}
     </div>
   );

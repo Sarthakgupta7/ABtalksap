@@ -7,7 +7,10 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { VIDEOTHON, isVideothonRegistrationOpen } from "@/features/hackathon-video/config";
+import { getVerifiedPhone } from "@/features/hackathon-video/get-verified-phone";
 import { sendVideoWelcomeEmail } from "@/lib/hackathon-video-email";
+import { isOtpVerificationRequired } from "@/lib/feature-flags";
+import { INDIA_DIALING_CODE } from "@/lib/validations/phone";
 import { recordLegalConsents } from "@/features/legal/record-consent";
 import { recordNewsletterOptIn } from "@/features/legal/record-newsletter-optin";
 import {
@@ -58,6 +61,26 @@ export async function submitVideoRegistrationAction(input: VideoRegistrationInpu
   }
   const d = parsed.data;
 
+  // Re-check the phone server-side — never trust the client. A number already
+  // verified on the platform is locked on the form, so it must come back
+  // unchanged; any other +91 number must have just been OTP-verified.
+  // Non-India numbers cannot be OTP-verified and are accepted as typed.
+  if (isOtpVerificationRequired()) {
+    const verified = await getVerifiedPhone(userId);
+    const matchesVerified =
+      verified !== null &&
+      verified.countryCode === d.phoneCountryCode &&
+      verified.phoneNumber === d.phoneNumber;
+    const needsMatch =
+      verified !== null || d.phoneCountryCode === INDIA_DIALING_CODE;
+    if (needsMatch && !matchesVerified) {
+      return {
+        ok: false as const,
+        message: "Please verify your phone number to continue.",
+      };
+    }
+  }
+
   const sourceSlug = await readSourceSlug();
 
   try {
@@ -70,6 +93,7 @@ export async function submitVideoRegistrationAction(input: VideoRegistrationInpu
         phoneCountryCode: d.phoneCountryCode,
         phoneNumber: d.phoneNumber,
         city: d.city,
+        state: d.state ?? null,
         employment: d.employment,
         currentCtc: d.currentCtc ?? null,
         portfolioUrl: d.portfolioUrl,
@@ -95,8 +119,12 @@ export async function submitVideoRegistrationAction(input: VideoRegistrationInpu
     };
   }
 
-  // Fire-and-forget side effects. Failures never invalidate the registration.
-  void sendVideoWelcomeEmail(fullName, email);
+  // Send the confirmation email BEFORE the action returns — fire-and-forget
+  // on Vercel serverless can be killed mid-flight when the function replies.
+  // `sendVideoWelcomeEmail` catches its own transport errors and logs; it
+  // never throws, so awaiting it can't break registration.
+  await sendVideoWelcomeEmail(fullName, email);
+
   try {
     await recordLegalConsents({ userId, email, source: "hackathon" });
     await recordNewsletterOptIn({

@@ -12,17 +12,29 @@ import { VideoSubmissionForm } from "@/components/hackathon-video/submission-for
 import "@/components/hackathon-video/landing.css";
 
 export const metadata: Metadata = {
-  title: `Your dashboard · ${VIDEOTHON.name}`,
+  title: `Your desk · ${VIDEOTHON.name}`,
 };
 
 /**
- * VideoThon participant dashboard.
+ * VideoThon participant dashboard, rendered inside the shared hackathon shell
+ * (sidebar + header, see `(app)/layout.tsx`).
  *
- * Notable deviation from the code hackathon: this page does NOT call
- * `registrationRedirect`. VideoThon participants intentionally do not go
- * through the general candidate-profile funnel — the only "am I registered"
- * check is the `HackathonVideoRegistration` row. Any signed-in user without
- * a row is bounced to `/hackathon` where the landing auto-opens the form.
+ * The whole page is black. Top to bottom:
+ *   - Reel hero — the exact `/hackathon` hero markup (CRT layers + film
+ *     reels), full bleed across the content column, "VideoThon" title with
+ *     the participant's welcome underneath, status and the countdown
+ *   - Flat sections on the page (hairline dividers, no cards): problem
+ *     statement (locked until kickoff), submission form, four guidelines,
+ *     schedule
+ *   - Registration on file — a black matte event pass on a white band
+ *
+ * Monochrome on purpose: the desk overrides the landing's yellow / pink / blue
+ * accents in `landing.css`; only the red REC dot stays, as on the landing.
+ *
+ * Does NOT call `registrationRedirect` — VideoThon participants skip the
+ * candidate-profile funnel. The only "am I registered" check is the
+ * `HackathonVideoRegistration` row; anyone signed in without one goes back
+ * to `/hackathon`, where the Register button opens the form.
  */
 export default async function VideothonDashboardPage() {
   const session = await auth();
@@ -32,121 +44,282 @@ export default async function VideothonDashboardPage() {
 
   const registration = await getMyVideoRegistration(session.user.id);
   if (!registration) {
-    // Not registered for VideoThon — bounce back to the landing. The landing
-    // detects "authed + no row" and pops the form dialog immediately.
     redirect("/hackathon");
   }
 
   const window = getVideothonSubmissionWindow();
   const firstName = registration.fullName.split(" ")[0] ?? registration.fullName;
-  const pill = window.closed
-    ? { tone: "ended", label: "Wrapped" }
-    : window.unlocked
-      ? { tone: "live", label: "Live · Editing window open" }
-      : { tone: "pre", label: "Registered · Kickoff pending" };
+  const phase = window.closed ? "ended" : window.unlocked ? "live" : "pre";
+  
+  const lede =
+    phase === "ended"
+      ? `Submissions are closed. ${VIDEOTHON.resultsLabel}.`
+      : phase === "live"
+        ? "The clock is running. Cut, export, and save your link before the deadline."
+        : "You're in. The problem statement unlocks here.";
+  const resultsDate = VIDEOTHON.resultsLabel.replace(/^Winners announced: /, "");
 
   return (
-    <div className="vt">
-      <div className="vt-dash">
-        <header className="vt-dash__welcome">
-          <h1 className="vt-dash__hi">Welcome, {firstName}.</h1>
-          <span className="vt-dash__pill" data-tone={pill.tone}>
-            {pill.label}
-          </span>
+    <div className="vt-mono vt-desk">
+      {/* ============ HERO — same reel treatment as /hackathon ============ */}
+      <section className="hk-hero vt-hero" aria-labelledby="vt-desk-title">
+        <div className="vt-hero__bg" aria-hidden>
+          <span className="vt-hero__scan" />
+          <span className="vt-hero__noise" />
+          <span className="vt-hero__dust" />
+          <span className="vt-hero__signal" />
+        </div>
+        <div className="vt-hero__reel vt-hero__reel--left" aria-hidden />
+        <div className="vt-hero__reel vt-hero__reel--right" aria-hidden />
+        <div className="vt-hero__inner">
+          
+
+          <h1 className="vt-hero__title" id="vt-desk-title">
+            <em data-glitch={VIDEOTHON.name}>{VIDEOTHON.name}</em>
+            <span className="vt-hero__title-sub">Welcome to the Dashboard, {firstName}</span>
+          </h1>
+
+          <p className="vt-hero__lede">{lede}</p>
+
+          <div className="vt-hero__timer">
+            <VideothonCountdown
+              kickoffUtc={VIDEOTHON.kickoffUtc}
+              deadlineUtc={VIDEOTHON.deadlineUtc}
+            />
+          </div>
+
+          <dl className="vt-hero__meta" aria-label="Event window">
+            <div>
+              <dt>Kickoff</dt>
+              <dd>{VIDEOTHON.kickoffLabel}</dd>
+            </div>
+            <div>
+              <dt>Deadline</dt>
+              <dd>{VIDEOTHON.deadlineLabel}</dd>
+            </div>
+            <div>
+              <dt>Results</dt>
+              <dd>{resultsDate}</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      {/* ============ PROBLEM STATEMENT — full width ============ */}
+      <section
+        className={`vt-card vt-card--dark vt-brief${window.unlocked ? " is-open" : " is-locked"}`}
+        aria-labelledby="vt-brief-title"
+      >
+        <header className="vt-card__head">
+          <p className="vt-card__eyebrow">Scene 01 · Problem statement</p>
+          {/* <span className="vt-card__tag" data-tone={window.unlocked ? "live" : "locked"}>
+            {window.unlocked ? "Unlocked" : "Locked"}
+          </span> */}
         </header>
 
-        {/* Countdown as a compact strip. Same component as the landing hero
-            so the phase logic is consistent — it just sits in a panel here. */}
-        <section className="vt-panel">
-          <p className="vt-panel__eyebrow">Timer</p>
-          <VideothonCountdown
-            kickoffUtc={VIDEOTHON.kickoffUtc}
-            deadlineUtc={VIDEOTHON.deadlineUtc}
-          />
-          <p className="vt-panel__meta" style={{ marginTop: 16 }}>
-            {window.closed
-              ? `Deadline was ${VIDEOTHON.deadlineLabel}. ${VIDEOTHON.resultsLabel}.`
-              : window.unlocked
-                ? `Deadline: ${VIDEOTHON.deadlineLabel}`
-                : `Kickoff: ${VIDEOTHON.kickoffLabel}`}
-          </p>
-        </section>
-
-        {/* Brief card. Reads from config today; a future ticket can pull this
-            from a HackathonProblem-style DB row once briefs are seeded. */}
-        <section className="vt-panel">
-          <p className="vt-panel__eyebrow">The brief</p>
-          {window.unlocked ? (
-            <p className="vt-panel__brief">{VIDEOTHON.brief}</p>
-          ) : (
-            <p className="vt-panel__brief vt-panel__brief--locked">
-              The brief drops at kickoff. Watch the WhatsApp group.
-            </p>
-          )}
-          {VIDEOTHON.whatsappLink ? (
-            <p className="vt-panel__meta" style={{ marginTop: 16 }}>
-              <Link
-                href={VIDEOTHON.whatsappLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="vt-row__link"
-              >
-                Open WhatsApp group →
-              </Link>
-            </p>
-          ) : null}
-        </section>
-
-        {/* Submission — the whole reason for the dashboard. */}
-        <VideoSubmissionForm
-          initial={registration.submission}
-          editable={window.editable}
-          closed={window.closed}
-        />
-
-        {/* Read-only echo of the identity + registration answers, so participants
-            can double-check what they submitted (portfolio link especially). */}
-        <section className="vt-panel">
-          <p className="vt-panel__eyebrow">Your registration</p>
-          <div className="vt-panel__stack">
-            <div className="vt-row">
-              <span className="vt-row__label">Name</span>
-              <span className="vt-row__value">{registration.fullName}</span>
-            </div>
-            <div className="vt-row">
-              <span className="vt-row__label">Email</span>
-              <span className="vt-row__value">{registration.email}</span>
-            </div>
-            <div className="vt-row">
-              <span className="vt-row__label">Phone</span>
-              <span className="vt-row__value">{registration.phoneDisplay}</span>
-            </div>
-            <div className="vt-row">
-              <span className="vt-row__label">City</span>
-              <span className="vt-row__value">{registration.city}</span>
-            </div>
-            <div className="vt-row">
-              <span className="vt-row__label">Status</span>
-              <span className="vt-row__value">
-                {registration.employment === "WORKING" ? "Working" : "Learner"}
-                {registration.currentCtc
-                  ? ` · CTC ${registration.currentCtc}`
-                  : ""}
+        {window.unlocked ? (
+          <>
+            <div className="vt-brief__lock">
+              <span className="vt-brief__lock-icon" aria-hidden>
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <rect x="4" y="10.5" width="16" height="10.5" rx="2.4" />
+                  <path d="M8 10.5V7.6a4 4 0 0 1 7.7-1.5" />
+                </svg>
               </span>
+              <div>
+                <h2 className="vt-card__title" id="vt-brief-title">
+                  The problem statement is unlocked
+                </h2>
+                <p className="vt-card__body">
+                  Dropped at {VIDEOTHON.kickoffLabel}.
+                </p>
+              </div>
             </div>
-            <div className="vt-row">
-              <span className="vt-row__label">Portfolio</span>
-              <a
-                className="vt-row__value vt-row__link"
-                href={registration.portfolioUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {registration.portfolioUrl}
-              </a>
+            <p className="vt-brief__text">{VIDEOTHON.brief}</p>
+          </>
+        ) : (
+          <>
+            <div className="vt-brief__lock">
+              <span className="vt-brief__lock-icon" aria-hidden>
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <rect x="4" y="10.5" width="16" height="10.5" rx="2.4" />
+                  <path d="M8 10.5V7.6a4 4 0 0 1 8 0v2.9" />
+                </svg>
+              </span>
+              <div>
+                <h2 className="vt-card__title" id="vt-brief-title">
+                  The problem statement is locked
+                </h2>
+                <p className="vt-card__body">
+                  Unlocks at kickoff, {VIDEOTHON.kickoffLabel}. 
+                </p>
+              </div>
             </div>
-          </div>
-        </section>
+          </>
+        )}
+
+        {/* {VIDEOTHON.whatsappLink ? (
+          <Link
+            href={VIDEOTHON.whatsappLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="vt-card__link"
+          >
+            Open the WhatsApp group
+            <svg viewBox="0 0 24 24" aria-hidden focusable="false">
+              <path d="M4 12h15M13 6l6 6-6 6" />
+            </svg>
+          </Link>
+        ) : null} */}
+      </section>
+
+      {/* ============ SUBMISSION ============ */}
+      <VideoSubmissionForm
+        initial={registration.submission}
+        editable={window.editable}
+        closed={window.closed}
+      />
+
+      {/* ============ GUIDELINES — four, 2×2 ============ */}
+      <section className="vt-card vt-card--dark" aria-labelledby="vt-guidelines-title">
+        <header className="vt-card__head">
+          <p className="vt-card__eyebrow" id="vt-guidelines-title">
+            Scene 03 · Guidelines
+          </p>
+          
+        </header>
+        <ol className="vt-guidelines">
+          <li>
+            <strong>One public link anyone can open.</strong> Drive, Behance,
+            YouTube or Vimeo, set to &quot;Anyone with the link can
+            view&quot;. Judges won&apos;t request access.
+          </li>
+          <li>
+            <strong>Solo, and only work you have rights to.</strong> No
+            collaborators, no client or copyrighted footage. Licensed stock is
+            fine; credit it in the notes.
+          </li>
+          <li>
+            <strong>Everything inside the 24 hours.</strong> Cut, grade, sound
+            and export happen after kickoff. Disclose any pre-built templates.
+          </li>
+          <li>
+            <strong>Re-save until the deadline.</strong> The last save is what
+            judges see; late saves don&apos;t count. Notes are optional.
+          </li>
+        </ol>
+      </section>
+
+      {/* ============ SCHEDULE ============ */}
+      <section className="vt-card vt-card--dark vt-schedule-strip" aria-labelledby="vt-schedule-title">
+        <header className="vt-card__head">
+          <p className="vt-card__eyebrow" id="vt-schedule-title">
+            Scene 04 · Schedule
+          </p>
+          
+        </header>
+        <ol className="vt-schedule vt-schedule--horizontal">
+          <li className={phase !== "pre" ? "is-past" : "is-next"}>
+            <span className="vt-schedule__pip" aria-hidden />
+            <div>
+              <p className="vt-schedule__label">Kickoff</p>
+              <p className="vt-schedule__value">{VIDEOTHON.kickoffLabel}</p>
+            </div>
+          </li>
+          <li className={phase === "ended" ? "is-past" : ""}>
+            <span className="vt-schedule__pip" aria-hidden />
+            <div>
+              <p className="vt-schedule__label">Halfway check-in</p>
+              {/* <p className="vt-schedule__value">Optional pulse in WhatsApp</p> */}
+            </div>
+          </li>
+          <li className={phase === "ended" ? "is-past" : phase === "live" ? "is-next" : ""}>
+            <span className="vt-schedule__pip" aria-hidden />
+            <div>
+              <p className="vt-schedule__label">Deadline</p>
+              <p className="vt-schedule__value">{VIDEOTHON.deadlineLabel}</p>
+            </div>
+          </li>
+          <li className={phase === "ended" ? "is-next" : ""}>
+            <span className="vt-schedule__pip" aria-hidden />
+            <div>
+              <p className="vt-schedule__label">Results</p>
+              <p className="vt-schedule__value">{resultsDate}</p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      {/* ============ REGISTRATION — black event pass on a white band ============ */}
+      <div className="vt-pass">
+        <div className="vt-pass__inner">
+          <section className="vt-ticket" aria-labelledby="vt-reg-title">
+            <div className="vt-ticket__main">
+              <header className="vt-card__head">
+                <p className="vt-card__eyebrow" id="vt-reg-title">
+                  Your registration on file
+                </p>
+                <span className="vt-card__tag" data-tone="info">
+                  Read-only
+                </span>
+              </header>
+              <p className="vt-ticket__title">
+                {VIDEOTHON.name}
+                <span className="vt-ticket__title-sub">Participant pass</span>
+              </p>
+              <dl className="vt-ticket__grid">
+                <div>
+                  <dt>Name</dt>
+                  <dd>{registration.fullName}</dd>
+                </div>
+                <div>
+                  <dt>Email</dt>
+                  <dd>{registration.email}</dd>
+                </div>
+                <div>
+                  <dt>Phone</dt>
+                  <dd>{registration.phoneDisplay}</dd>
+                </div>
+                <div>
+                  <dt>City</dt>
+                  <dd>{registration.city}</dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>
+                    {registration.employment === "WORKING" ? "Working" : "Learner"}
+                    {registration.employment === "WORKING" && registration.currentCtc
+                      ? ` · CTC ${registration.currentCtc}`
+                      : ""}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Portfolio</dt>
+                  <dd>
+                    <a
+                      href={registration.portfolioUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="vt-ticket__link"
+                    >
+                      {registration.portfolioUrl}
+                    </a>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            {/* Tear-off stub — decorative. */}
+            <div className="vt-ticket__stub" aria-hidden>
+              <div>
+                <p className="vt-ticket__stub-label">Admit</p>
+                <p className="vt-ticket__stub-big">One</p>
+                <p className="vt-ticket__stub-label">Solo entry · 24 hrs</p>
+              </div>
+              <span className="vt-ticket__barcode" />
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );

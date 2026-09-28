@@ -1,4 +1,4 @@
-/*
+﻿/*
  * VideoThon — supplemental styles.
  *
  * The landing itself uses the existing `.hk-*` classes from
@@ -861,94 +861,97 @@
   stroke-linejoin: round;
 }
 
-/* Event-window panel on the dark hero. Each column carries a small colored
-   pip next to its label (red pulse for kickoff = "recording", amber for
-   deadline = "warning", cyan for results = "complete"). The panel itself
-   is a raised bezel with a subtle inner top highlight. */
+/* Event-window panel on the dark hero. Three symmetric columns, each with
+   a colored pip + mono label + bold value. Higher contrast, bigger text,
+   center-aligned so the three columns read as identical containers. */
 .vt-mono .vt-hero__meta {
-  margin: 12px 0 0;
-  padding: 18px 26px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 14px;
+  margin: 16px 0 0;
+  padding: 22px 28px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 16px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0.02) 100%);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075) 0%, rgba(255, 255, 255, 0.025) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 16px 40px -12px rgba(0, 0, 0, 0.6);
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 20px 48px -12px rgba(0, 0, 0, 0.7);
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 4px 20px;
-  min-width: min(100%, 640px);
+  gap: 0;
+  width: min(100%, 720px);
 }
 .vt-mono .vt-hero__meta > div {
   display: grid;
-  gap: 6px;
-  padding: 0 14px;
-  border-left: 1px solid rgba(255, 255, 255, 0.14);
-  text-align: left;
+  gap: 10px;
+  padding: 4px 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.16);
+  text-align: center;
+  justify-items: center;
   position: relative;
 }
 .vt-mono .vt-hero__meta > div:first-child {
   border-left: none;
-  padding-left: 0;
 }
 .vt-mono .vt-hero__meta dt {
   font-family: ui-monospace, "SF Mono", "Consolas", monospace;
-  font-size: 10px;
-  letter-spacing: 0.20em;
+  font-size: 11px;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.62);
+  color: rgba(255, 255, 255, 0.68);
   margin: 0;
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  line-height: 1;
 }
 /* Colored status pip next to each dt — different color per event. */
 .vt-mono .vt-hero__meta dt::before {
   content: "";
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 999px;
   background: #FFFFFF;
   flex: 0 0 auto;
 }
 .vt-mono .vt-hero__meta > div:nth-child(1) dt::before {
   background: #FF3B30;
-  box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.55);
+  box-shadow: 0 0 8px rgba(255, 59, 48, 0.6), 0 0 0 0 rgba(255, 59, 48, 0.55);
   animation: vt-rec 1.6s ease-in-out infinite;
 }
 .vt-mono .vt-hero__meta > div:nth-child(2) dt::before {
   background: var(--vt-yellow, #FFE45C);
-  box-shadow: 0 0 8px rgba(255, 228, 92, 0.4);
+  box-shadow: 0 0 10px rgba(255, 228, 92, 0.55);
 }
 .vt-mono .vt-hero__meta > div:nth-child(3) dt::before {
   background: var(--vt-blue, #3CD1FF);
-  box-shadow: 0 0 8px rgba(60, 209, 255, 0.4);
+  box-shadow: 0 0 10px rgba(60, 209, 255, 0.55);
 }
 .vt-mono .vt-hero__meta dd {
   margin: 0;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   color: #FFFFFF;
   line-height: 1.35;
   letter-spacing: 0.005em;
+  white-space: nowrap;
 }
 @media (max-width: 640px) {
   .vt-mono .vt-hero__meta {
     grid-template-columns: 1fr;
-    padding: 14px 18px;
+    padding: 16px 20px;
+    gap: 0;
   }
   .vt-mono .vt-hero__meta > div {
     border-left: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.14);
-    padding: 10px 0 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+    padding: 14px 0;
   }
   .vt-mono .vt-hero__meta > div:first-child {
     border-top: none;
-    padding-top: 0;
+    padding-top: 4px;
   }
+  .vt-mono .vt-hero__meta dd { white-space: normal; }
 }
 
 /* ============================================================
@@ -1109,6 +1112,15 @@
 .vt-dialog__sub { font-size: 13px; color: #626262; }
 .vt-dialog__body { padding-top: 10px; }
 
+/* Dropdowns inside the register dialog (country code, state, city
+   suggestions). `ui/dialog` sits at z-index 200, but Select and Autocomplete
+   portal their positioner to <body> at z-50, so the lists opened BEHIND the
+   dialog and looked dead. While this dialog is open, lift any Base UI
+   positioner (role="presentation") that holds a listbox above it. */
+body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
+  z-index: 300;
+}
+
 .vt-form { display: grid; gap: 16px; }
 .vt-form__identity {
   display: grid;
@@ -1139,7 +1151,40 @@
   grid-template-columns: 180px 1fr;
   gap: 12px;
 }
+.vt-form__row-2--even { grid-template-columns: 1fr 1fr; }
 @media (max-width: 480px) { .vt-form__row-2 { grid-template-columns: 1fr; } }
+
+/* Phone row (shared PhoneVerifyField): the code picker gets a fixed width wide
+   enough for "+971 United…"; the number input takes the rest. */
+.vt-form__phone [data-slot="select-trigger"] { width: 9.5rem; }
+@media (max-width: 480px) {
+  .vt-form__phone [data-slot="select-trigger"] { width: 6.5rem; }
+}
+
+/* Already-verified number: read-only, same box as an input. */
+.vt-form__verified {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--ab-border, #E9E9E9);
+  border-radius: 12px;
+  background: var(--ab-primary-soft, #EEF6F6);
+  font-size: 14px;
+  color: var(--ab-ink, #353535);
+}
+.vt-form__verified-number { font-weight: 500; letter-spacing: 0.02em; }
+.vt-form__verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #197E23;
+}
+.vt-form__verified-badge svg { width: 16px; height: 16px; }
 .vt-form__hint {
   color: var(--ab-muted, #787878);
   font-size: 12px;
@@ -1326,3 +1371,866 @@
 }
 .vt-row__link { color: var(--ab-primary, #03535F); text-decoration: none; }
 .vt-row__link:hover { text-decoration: underline; }
+
+/* ============================================================
+ * RESPONSIVE — mobile + all-device support
+ * ------------------------------------------------------------
+ * The shell's `.hk-*` sections already carry responsive rules
+ * inside `_styles/hackathon-v2.css`. Everything below is for
+ * the VideoThon-specific overrides (hero card, countdown,
+ * CTAs, event panel, dashboard, registration dialog) that were
+ * built after the shell's breakpoints.
+ *
+ * Breakpoint ladder:
+ *   ≤ 960px  — small tablets
+ *   ≤ 640px  — large phones / small tablets
+ *   ≤ 480px  — regular phones
+ *   ≤ 360px  — ultra-small phones (Galaxy Fold, older SEs)
+ * ============================================================ */
+
+/* --- Small tablets & below ---------------------------------- */
+@media (max-width: 960px) {
+  .vt-mono .vt-hero.hk-hero {
+    border-radius: 20px;
+    margin: clamp(10px, 1.4vw, 20px);
+    padding-top: clamp(56px, 8vw, 96px);
+    padding-bottom: clamp(56px, 8vw, 96px);
+  }
+  .vt-hero__inner { gap: 22px; }
+  .vt-hero__title { font-size: clamp(44px, 8vw, 84px); }
+  .vt-mono .vt-hero .vt-count__num { font-size: 28px; }
+  .vt-mono .vt-hero__meta { padding: 20px 24px; }
+}
+
+/* --- Large phones / small tablets --------------------------- */
+@media (max-width: 640px) {
+  .vt-mono .vt-hero.hk-hero {
+    padding-left: 56px;
+    padding-right: 56px;
+    padding-top: 44px;
+    padding-bottom: 44px;
+    border-radius: 16px;
+    margin: 8px;
+  }
+  /* Reel width was already 44px in the earlier @media block; keep it here
+     so this section wins the cascade for other reel props. */
+  .vt-hero__reel { width: 44px; }
+
+  .vt-hero__inner { gap: 18px; }
+  .vt-hero__title { font-size: clamp(38px, 9vw, 64px); line-height: 1.02; }
+  .vt-hero__title-sub { font-size: 15px; }
+  .vt-hero__eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.20em;
+    padding: 5px 12px;
+  }
+  .vt-hero__lede { font-size: 14px; max-width: 92%; }
+
+  /* CTAs stack full-width — cleaner than half-width side-by-side that
+     wraps awkwardly at a random breakpoint. */
+  .vt-hero__ctas { gap: 10px; width: 100%; flex-direction: column; }
+  .vt-mono .vt-hero__ctas .vt-btn--primary,
+  .vt-mono .vt-hero__ctas .ab-btn--ghost {
+    width: 100%;
+    min-width: 0;
+    height: 48px;
+    padding: 0 20px;
+    font-size: 13px;
+  }
+
+  /* Countdown — tighten padding and shrink digits so all 4 tiles + phase
+     fit inside a phone width without wrapping. */
+  .vt-mono .vt-hero .vt-count {
+    padding: 10px 12px;
+    gap: 6px;
+    max-width: 100%;
+  }
+  .vt-mono .vt-hero .vt-count__phase {
+    padding: 0 8px 0 2px;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+  }
+  .vt-mono .vt-hero .vt-count__tile {
+    min-width: 42px;
+    padding: 5px 6px 6px;
+  }
+  .vt-mono .vt-hero .vt-count__num { font-size: 22px; }
+  .vt-mono .vt-hero .vt-count__label { font-size: 8px; letter-spacing: 0.16em; }
+
+  /* Event panel already stacks one-per-row here — just tighten. */
+  .vt-mono .vt-hero__meta { padding: 16px 20px; }
+  .vt-mono .vt-hero__meta dd { font-size: 13px; white-space: normal; }
+}
+
+/* --- Regular phones ----------------------------------------- */
+@media (max-width: 480px) {
+  .vt-mono .vt-hero.hk-hero {
+    padding-left: 48px;
+    padding-right: 48px;
+    padding-top: 40px;
+    padding-bottom: 40px;
+    border-radius: 14px;
+    margin: 6px;
+  }
+  .vt-hero__inner { gap: 16px; }
+  .vt-hero__title { font-size: clamp(34px, 10vw, 54px); }
+  .vt-hero__title-sub { font-size: 14px; }
+  .vt-hero__lede { font-size: 13.5px; line-height: 1.5; }
+
+  /* Countdown — hide phase label; it eats too much horizontal space and
+     "STARTS IN" duplicates the meta panel below. Tiles are still labeled
+     (Days / Hrs / Min / Sec). */
+  .vt-mono .vt-hero .vt-count__phase { display: none; }
+  .vt-mono .vt-hero .vt-count { padding: 9px 10px; gap: 5px; }
+  .vt-mono .vt-hero .vt-count__tile { min-width: 38px; padding: 4px 4px 5px; }
+  .vt-mono .vt-hero .vt-count__num { font-size: 20px; }
+  .vt-mono .vt-hero .vt-count__label { font-size: 7.5px; }
+
+  .vt-mono .vt-hero__meta { padding: 14px 16px; }
+}
+
+/* --- Ultra-small phones ------------------------------------- */
+@media (max-width: 360px) {
+  .vt-mono .vt-hero.hk-hero {
+    /* Hide the film reels entirely on very tight screens so the content
+       column has room to breathe. */
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-top: 32px;
+    padding-bottom: 32px;
+    border-radius: 12px;
+    margin: 4px;
+  }
+  .vt-hero__reel { display: none; }
+
+  .vt-hero__inner { gap: 14px; }
+  .vt-hero__title { font-size: clamp(28px, 11vw, 40px); letter-spacing: -0.02em; }
+  .vt-hero__eyebrow { font-size: 9px; padding: 4px 10px; letter-spacing: 0.18em; }
+  .vt-hero__lede { font-size: 13px; }
+
+  .vt-mono .vt-hero .vt-count { padding: 8px 8px; gap: 4px; }
+  .vt-mono .vt-hero .vt-count__tile { min-width: 34px; padding: 3px 3px 5px; }
+  .vt-mono .vt-hero .vt-count__num { font-size: 17px; }
+  .vt-mono .vt-hero .vt-count__label { font-size: 7px; }
+
+  .vt-mono .vt-hero__meta { padding: 12px 14px; }
+  .vt-mono .vt-hero__meta dt { font-size: 10px; letter-spacing: 0.18em; }
+  .vt-mono .vt-hero__meta dd { font-size: 12.5px; }
+
+  .vt-mono .vt-hero__ctas .vt-btn--primary,
+  .vt-mono .vt-hero__ctas .ab-btn--ghost {
+    height: 44px;
+    font-size: 12.5px;
+  }
+}
+
+/* --- Dashboard responsive ----------------------------------- */
+@media (max-width: 640px) {
+  .vt-dash { padding: 20px 16px 48px; max-width: 100%; }
+  .vt-dash__hi { font-size: 24px; }
+  .vt-dash__pill { font-size: 9.5px; padding: 3px 10px; letter-spacing: 0.14em; }
+  .vt-panel { padding: 18px; border-radius: 10px; }
+  .vt-panel__title { font-size: 18px; }
+  .vt-panel__body { font-size: 13.5px; }
+  .vt-panel__brief { font-size: 16px; }
+  .vt-panel__actions { flex-direction: column; align-items: stretch; }
+  .vt-panel__actions > .vt-btn,
+  .vt-panel__actions > .ab-btn { width: 100%; }
+  .vt-field__input,
+  .vt-field__textarea { font-size: 16px; /* 16px avoids iOS Safari autozoom on focus */ }
+}
+@media (max-width: 480px) {
+  .vt-dash { padding: 16px 14px 40px; }
+  .vt-dash__hi { font-size: 22px; }
+  .vt-panel { padding: 16px; }
+  .vt-panel__title { font-size: 17px; }
+  .vt-panel__brief { font-size: 15px; }
+  .vt-row__value { font-size: 13.5px; }
+  .vt-row__label { font-size: 9.5px; letter-spacing: 0.14em; }
+}
+
+/* --- Registration dialog form responsive -------------------- */
+@media (max-width: 480px) {
+  /* The dialog itself is sized by Radix; the body just needs to fit. */
+  .vt-dialog__title { font-size: 18px; }
+  .vt-dialog__sub { font-size: 12.5px; }
+  .vt-form { gap: 14px; }
+  .vt-form__identity { padding: 10px 12px; }
+  .vt-form__identity-row { font-size: 12.5px; gap: 10px; }
+  .vt-form__identity-label { min-width: 42px; font-size: 9.5px; }
+  .vt-form__choice { padding: 10px 12px; grid-template-columns: auto 1fr; gap: 10px; }
+  .vt-form__choice-title { font-size: 13px; }
+  .vt-form__choice-body { font-size: 12px; }
+  .vt-form__hint { font-size: 11.5px; }
+  .vt-form__actions { flex-direction: column; align-items: stretch; }
+  .vt-form__actions > .vt-btn,
+  .vt-form__actions > button { width: 100%; }
+  /* iOS Safari triggers a viewport zoom when tapping any input below 16px.
+     Keep inputs at exactly 16px inside the dialog on small screens. */
+  .vt-form input,
+  .vt-form textarea,
+  .vt-form select { font-size: 16px !important; }
+}
+
+/* --- Landscape phones: cap hero height so buttons are visible ------- */
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 480px) {
+  .vt-mono .vt-hero.hk-hero {
+    padding-top: 24px;
+    padding-bottom: 24px;
+  }
+  .vt-hero__inner { gap: 14px; }
+  .vt-hero__title { font-size: clamp(32px, 6vw, 52px); }
+  .vt-hero__lede { max-width: 100%; }
+}
+
+/* ============================================================
+ * PARTICIPANT DESK  (dashboard)
+ * ------------------------------------------------------------
+ * /hackathon/dashboard, inside the shared hackathon shell.
+ *
+ * The whole page is black. The landing's reel hero (same markup +
+ * classes) runs edge to edge across the content column; everything
+ * below sits flat on the page — full-bleed sections split by
+ * hairlines, with a label rail on the left on wide screens, never a
+ * stack of boxed cards. The registration pass closes the page: a
+ * black matte ticket on a white band.
+ *
+ * Monochrome: no yellow / pink / blue accents anywhere on the desk.
+ * The landing's hero rules read `--vt-yellow` / `--vt-pink` /
+ * `--vt-blue`, so the desk redefines them to neutrals and overrides
+ * the few hard-coded tints below. Only the red REC dot survives,
+ * exactly as on the landing.
+ * ============================================================ */
+
+/* The shell's content area is white (it is on the landing). On the desk
+   it goes black, and drops its bottom padding so the white pass band
+   is what ends the page. */
+.ab-content:has(> .vt-desk) {
+  background: #0A0A0A;
+  padding-bottom: 0;
+}
+
+.vt-mono.vt-desk {
+  --vt-yellow:        #FFFFFF;
+  --vt-pink:          #8A8A8A;
+  --vt-blue:          #D4D4D4;
+
+  --vt-page:          #0A0A0A;
+  /* Schedule pips punch the rail line out with this colour. */
+  --vt-card-bg:       var(--vt-page);
+  --vt-card-border:   rgba(255, 255, 255, 0.10);
+  --vt-card-hair:     rgba(255, 255, 255, 0.10);
+  --vt-text:          #FFFFFF;
+  --vt-muted:         rgba(255, 255, 255, 0.70);
+  --vt-dim:           rgba(255, 255, 255, 0.50);
+
+  /* Sections are full bleed; their content is capped at 1080px. */
+  --vt-gutter: max(clamp(20px, 4vw, 56px), calc((100% - 1080px) / 2));
+
+  display: block;
+  width: 100%;
+  background: var(--vt-page);
+  color: var(--vt-text);
+}
+
+/* ============================================================
+ * HERO — the landing's `.vt-hero` wholesale, but full bleed: no
+ * margin, no rounded card, no drop shadow, so the reels run the
+ * full height at the very edges of the content column.
+ * ============================================================ */
+.vt-mono.vt-desk .vt-hero.hk-hero {
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.vt-mono.vt-desk .vt-hero__bg {
+  background:
+    radial-gradient(1.5px 1.5px at 20px 20px, rgba(255, 255, 255, 0.18), transparent 60%),
+    radial-gradient(1.5px 1.5px at 60px 60px, rgba(255, 255, 255, 0.12), transparent 60%),
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.05), transparent 50%),
+    linear-gradient(180deg, #0F0F0F 0%, #0A0A0A 100%);
+  background-size: 80px 80px, 80px 80px, auto, auto;
+  background-position: 0 0, 40px 40px, center, center;
+}
+
+/* Status dot: red REC while the editing window is open (as on the
+   landing), steady white before kickoff, dimmed once wrapped. */
+.vt-mono.vt-desk .vt-hero__dot[data-tone="pre"] {
+  background: #FFFFFF;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.55);
+  animation: none;
+}
+.vt-mono.vt-desk .vt-hero__dot[data-tone="ended"] {
+  background: rgba(255, 255, 255, 0.4);
+  box-shadow: none;
+  animation: none;
+}
+
+/* Event-window pips: kickoff keeps the red REC pulse; the other two
+   were yellow / blue on the landing. */
+.vt-mono.vt-desk .vt-hero__meta > div:nth-child(2) dt::before {
+  background: #FFFFFF;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.45);
+}
+.vt-mono.vt-desk .vt-hero__meta > div:nth-child(3) dt::before {
+  background: transparent;
+  border: 1.5px solid #FFFFFF;
+  box-shadow: none;
+}
+
+/* The sidebar makes this hero narrower than the viewport, so the
+   landing's viewport breakpoints fire too late and the no-wrap event
+   panel overflows. Stack it by the content column (`.ab-content` is the
+   `content` container) instead. */
+.vt-mono.vt-desk .vt-hero__meta dd { white-space: normal; }
+@container content (max-width: 860px) {
+  .vt-mono.vt-desk .vt-hero__meta {
+    grid-template-columns: 1fr;
+    padding: 14px 20px;
+  }
+  .vt-mono.vt-desk .vt-hero__meta > div {
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+    padding: 12px 0;
+  }
+  .vt-mono.vt-desk .vt-hero__meta > div:first-child {
+    border-top: none;
+    padding-top: 4px;
+  }
+}
+
+/* ============================================================
+ * SECTIONS — `.vt-card--dark` keeps its name (the submission form
+ * renders it) but on the desk it is a flat, full-bleed band on the
+ * black page: hairline on top, no box, no radius, no shadow.
+ * ============================================================ */
+.vt-mono .vt-card--dark {
+  position: relative;
+  padding: clamp(36px, 5vw, 64px) var(--vt-gutter);
+  border-top: 1px solid var(--vt-card-hair);
+  background: transparent;
+  color: var(--vt-text);
+}
+
+.vt-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin: 0 0 20px;
+}
+.vt-card__eyebrow {
+  margin: 0;
+  font-family: ui-monospace, "SF Mono", "Consolas", monospace;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--vt-muted);
+}
+.vt-card__tag {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.20);
+  border-radius: 999px;
+  font-family: ui-monospace, "SF Mono", "Consolas", monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--vt-muted);
+}
+/* Open / unlocked / saved — inverted white pill. */
+.vt-card__tag[data-tone="live"] {
+  color: #0A0A0A;
+  background: #FFFFFF;
+  border-color: #FFFFFF;
+  font-weight: 700;
+}
+.vt-card__tag[data-tone="locked"] { color: var(--vt-muted); border-style: dashed; border-color: rgba(255, 255, 255, 0.30); }
+.vt-card__tag[data-tone="ended"]  { color: var(--vt-dim);   border-color: rgba(255, 255, 255, 0.14); }
+.vt-card__tag[data-tone="info"]   { color: var(--vt-muted); border-color: rgba(255, 255, 255, 0.20); }
+
+/* Wide content column: section label becomes a left rail, content on
+   the right — an editorial layout rather than boxes. */
+@container content (min-width: 900px) {
+  .vt-mono.vt-desk .vt-card--dark {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    column-gap: clamp(32px, 5cqw, 72px);
+    align-items: start;
+  }
+  .vt-mono.vt-desk .vt-card--dark > * { grid-column: 2; }
+  .vt-mono.vt-desk .vt-card--dark > .vt-card__head {
+    grid-column: 1;
+    grid-row: 1 / span 8;
+    flex-direction: column;
+    align-items: flex-start;
+    margin: 0;
+    padding-top: 4px;
+  }
+}
+
+.vt-mono .vt-card__title {
+  margin: 0 0 8px;
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(22px, 2.2vw, 28px);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--vt-text);
+}
+.vt-mono .vt-card__body {
+  margin: 0;
+  max-width: 64ch;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--vt-muted);
+}
+.vt-mono .vt-card__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--vt-card-hair);
+  width: 100%;
+  font-family: ui-monospace, "SF Mono", "Consolas", monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--vt-text);
+  text-decoration: none;
+  transition: gap 0.15s ease;
+}
+.vt-mono .vt-card__link:hover { gap: 12px; }
+.vt-mono .vt-card__link:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 4px; }
+.vt-mono .vt-card__link svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  margin-left: auto;
+}
+
+/* ============================================================
+ * PROBLEM STATEMENT  (locked / unlocked)
+ * ============================================================ */
+.vt-brief__lock {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+.vt-brief__lock-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  color: #FFFFFF;
+}
+.vt-brief.is-open .vt-brief__lock-icon {
+  background: #FFFFFF;
+  border-color: #FFFFFF;
+  color: #0A0A0A;
+}
+.vt-brief__lock-icon svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.vt-brief.is-open .vt-card__title { font-size: clamp(24px, 2.8vw, 34px); }
+.vt-brief__text {
+  margin: 0;
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  font-size: 20px;
+  line-height: 1.5;
+  color: var(--vt-text);
+}
+/* The unlocked brief reads as a pull quote, not a box. */
+.vt-brief.is-open .vt-brief__text {
+  margin-top: 28px;
+  padding: 4px 0 4px 22px;
+  border-left: 3px solid #FFFFFF;
+  font-size: clamp(20px, 2.2vw, 28px);
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+/* ============================================================
+ * GUIDELINES  (four numbered rules, 2 columns, hairline rows)
+ * ============================================================ */
+.vt-guidelines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: clamp(24px, 3vw, 44px);
+  counter-reset: vt-rule;
+}
+.vt-guidelines li {
+  position: relative;
+  counter-increment: vt-rule;
+  padding: 18px 0 18px 48px;
+  border-top: 1px solid var(--vt-card-hair);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--vt-muted);
+}
+.vt-guidelines li strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--vt-text);
+  font-weight: 600;
+}
+.vt-guidelines li::before {
+  content: counter(vt-rule, decimal-leading-zero);
+  position: absolute;
+  top: 19px;
+  left: 0;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #FFFFFF;
+  color: #0A0A0A;
+  font-family: ui-monospace, "SF Mono", "Consolas", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+}
+
+/* ============================================================
+ * SCHEDULE  (horizontal rail, 4 stops) — hollow = upcoming,
+ * filled = past, glowing white = next up.
+ * ============================================================ */
+.vt-schedule--horizontal {
+  list-style: none;
+  margin: 0;
+  padding: 12px 0 4px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  position: relative;
+}
+.vt-schedule--horizontal::before {
+  content: "";
+  position: absolute;
+  top: 20px;
+  left: 0;
+  right: 8%;
+  height: 1px;
+  background: linear-gradient(to right, var(--vt-card-hair) 0%, var(--vt-card-hair) 92%, transparent 100%);
+}
+.vt-schedule--horizontal li {
+  display: grid;
+  gap: 10px;
+  padding: 0 16px 0 0;
+  justify-items: start;
+  position: relative;
+}
+.vt-schedule--horizontal .vt-schedule__pip {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: var(--vt-card-bg);
+  box-shadow: 0 0 0 5px var(--vt-card-bg);
+  z-index: 1;
+  margin: 6px 0 0;
+}
+.vt-schedule--horizontal li.is-past .vt-schedule__pip {
+  border-color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.55);
+}
+.vt-schedule--horizontal li.is-next .vt-schedule__pip {
+  border-color: #FFFFFF;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 5px var(--vt-card-bg), 0 0 14px rgba(255, 255, 255, 0.6);
+}
+.vt-schedule__label {
+  margin: 0;
+  font-family: ui-monospace, "SF Mono", "Consolas", monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--vt-dim);
+}
+.vt-schedule__value {
+  margin: 3px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vt-text);
+  line-height: 1.35;
+}
+.vt-schedule--horizontal li.is-past .vt-schedule__value {
+  color: var(--vt-dim);
+  text-decoration: line-through;
+  text-decoration-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================================
+ * REGISTRATION PASS — a black matte ticket on a white band.
+ * Main panel + tear-off stub split by a perforated edge with two
+ * punched notches. The notches are cut with a CSS mask, so they show
+ * the white band behind; the drop shadow lives on the wrapper (a
+ * `filter` follows the masked shape, a box-shadow would be clipped).
+ * ============================================================ */
+.vt-pass {
+  padding: clamp(44px, 6vw, 88px) var(--vt-gutter);
+  background: #FFFFFF;
+}
+.vt-pass__inner {
+  filter:
+    drop-shadow(0 26px 30px rgba(0, 0, 0, 0.20))
+    drop-shadow(0 3px 6px rgba(0, 0, 0, 0.14));
+}
+
+.vt-ticket {
+  --vt-stub-w: 200px;
+  --vt-stub-h: 96px;
+  --vt-notch: 14px;
+  --vt-cut-x: calc(100% - var(--vt-stub-w));
+
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--vt-stub-w);
+  border-radius: 18px;
+  color: #FFFFFF;
+  /* Matte: charcoal-to-black greyscale gradient, a soft light pool in
+     the top-left corner, and a fine grain on top so it never reads as
+     glossy. */
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.07 0'/></filter><rect width='160' height='160' filter='url(%23g)'/></svg>"),
+    radial-gradient(120% 140% at 0% 0%, rgba(255, 255, 255, 0.10) 0%, transparent 55%),
+    linear-gradient(135deg, #3A3A3A 0%, #262626 34%, #181818 68%, #0E0E0E 100%);
+  background-size: 160px 160px, auto, auto;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  -webkit-mask:
+    radial-gradient(circle var(--vt-notch) at var(--vt-cut-x) 0, #0000 98%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle var(--vt-notch) at var(--vt-cut-x) 100%, #0000 98%, #000) bottom / 100% 51% no-repeat;
+  mask:
+    radial-gradient(circle var(--vt-notch) at var(--vt-cut-x) 0, #0000 98%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle var(--vt-notch) at var(--vt-cut-x) 100%, #0000 98%, #000) bottom / 100% 51% no-repeat;
+}
+.vt-ticket .vt-card__head { margin-bottom: 16px; }
+.vt-ticket .vt-card__eyebrow { color: rgba(255, 255, 255, 0.62); }
+.vt-ticket .vt-card__tag { color: rgba(255, 255, 255, 0.70); border-color: rgba(255, 255, 255, 0.24); }
+.vt-ticket__main {
+  min-width: 0;
+  padding: clamp(22px, 2.6vw, 32px);
+}
+.vt-ticket__title {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(26px, 2.8vw, 34px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.vt-ticket__title-sub {
+  font-family: ui-monospace, "SF Mono", "Consolas", monospace;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.vt-ticket__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px 24px;
+  margin: 22px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.vt-ticket__grid > div { min-width: 0; }
+.vt-ticket__grid dt {
+  margin: 0 0 6px;
+  font-family: ui-monospace, "SF Mono", "Consolas", monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.vt-ticket__grid dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #FFFFFF;
+  overflow-wrap: anywhere;
+}
+.vt-ticket__link {
+  color: #FFFFFF;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+  transition: border-color 0.15s ease;
+}
+.vt-ticket__link:hover { border-color: #FFFFFF; }
+
+.vt-ticket__stub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 26px 20px;
+  border-left: 2px dashed rgba(255, 255, 255, 0.26);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 100%);
+  text-align: center;
+}
+.vt-ticket__stub-label {
+  margin: 0;
+  font-family: ui-monospace, "SF Mono", "Consolas", monospace;
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.vt-ticket__stub-big {
+  margin: 2px 0 6px;
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: #FFFFFF;
+}
+/* Decorative barcode strip — uneven bars from one repeating gradient. */
+.vt-ticket__barcode {
+  display: block;
+  width: 100%;
+  max-width: 150px;
+  height: 44px;
+  opacity: 0.8;
+  background: repeating-linear-gradient(
+    90deg,
+    #FFFFFF 0 2px, transparent 2px 4px,
+    #FFFFFF 4px 5px, transparent 5px 8px,
+    #FFFFFF 8px 11px, transparent 11px 12px,
+    #FFFFFF 12px 13px, transparent 13px 16px
+  );
+}
+
+/* ============================================================
+ * SUBMISSION FORM on the black page (overrides light styles)
+ * ============================================================ */
+.vt-mono .vt-card--dark .vt-field__label { color: var(--vt-muted); }
+.vt-mono .vt-card--dark .vt-field__hint  { color: var(--vt-dim); }
+.vt-mono .vt-card--dark .vt-field__input,
+.vt-mono .vt-card--dark .vt-field__textarea {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: var(--vt-text);
+  font-size: 15px;
+  padding: 12px 14px;
+}
+.vt-mono .vt-card--dark .vt-field__input::placeholder,
+.vt-mono .vt-card--dark .vt-field__textarea::placeholder {
+  color: rgba(255, 255, 255, 0.32);
+}
+.vt-mono .vt-card--dark .vt-field__input:focus,
+.vt-mono .vt-card--dark .vt-field__textarea:focus {
+  border-color: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.14);
+}
+.vt-mono .vt-card--dark .vt-field__error { color: #FF6B61; }
+.vt-mono .vt-card--dark .vt-panel__stack { display: grid; gap: 16px; margin-top: 22px; }
+.vt-mono .vt-card--dark .vt-panel__actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 22px;
+}
+.vt-mono .vt-card--dark .vt-panel__meta { color: var(--vt-dim); margin-top: 12px; }
+.vt-mono .vt-card--dark .vt-btn--primary {
+  height: 48px;
+  padding: 0 28px;
+  border-radius: 12px;
+  background: #FFFFFF;
+  color: #0A0A0A;
+  border: 1px solid #FFFFFF;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.vt-mono .vt-card--dark .vt-btn--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px -8px rgba(255, 255, 255, 0.4);
+}
+.vt-mono .vt-card--dark .vt-row { border-top-color: var(--vt-card-hair); }
+.vt-mono .vt-card--dark .vt-row__label { color: var(--vt-dim); }
+.vt-mono .vt-card--dark .vt-row__value { color: var(--vt-text); }
+.vt-mono .vt-card--dark .vt-row__link {
+  color: var(--vt-text);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+/* ============================================================
+ * RESPONSIVE
+ * ============================================================ */
+/* Grids follow the content column (sidebar-aware), not the viewport. */
+@container content (max-width: 860px) {
+  .vt-ticket__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container content (max-width: 640px) {
+  .vt-guidelines { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  .vt-schedule--horizontal { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 12px; padding: 8px 0 4px; }
+  .vt-schedule--horizontal::before { display: none; }
+}
+@media (max-width: 640px) {
+  .vt-mono .vt-card--dark { padding-block: 32px; }
+  .vt-brief__lock { gap: 14px; }
+  .vt-brief__lock-icon { width: 42px; height: 42px; }
+  .vt-brief__text { font-size: 17px; }
+  .vt-mono .vt-card--dark .vt-panel__actions { flex-direction: column; }
+  .vt-mono .vt-card--dark .vt-btn--primary { width: 100%; }
+
+  /* Pass stacks: stub drops below the main panel, perforation turns
+     horizontal and the notches move to the left / right edges. */
+  .vt-ticket {
+    --vt-cut-y: calc(100% - var(--vt-stub-h));
+    grid-template-columns: minmax(0, 1fr);
+    -webkit-mask:
+      radial-gradient(circle var(--vt-notch) at 0 var(--vt-cut-y), #0000 98%, #000) left / 51% 100% no-repeat,
+      radial-gradient(circle var(--vt-notch) at 100% var(--vt-cut-y), #0000 98%, #000) right / 51% 100% no-repeat;
+    mask:
+      radial-gradient(circle var(--vt-notch) at 0 var(--vt-cut-y), #0000 98%, #000) left / 51% 100% no-repeat,
+      radial-gradient(circle var(--vt-notch) at 100% var(--vt-cut-y), #0000 98%, #000) right / 51% 100% no-repeat;
+  }
+  .vt-ticket__main { padding: 20px; }
+  .vt-ticket__stub {
+    height: var(--vt-stub-h);
+    flex-direction: row;
+    padding: 0 22px;
+    border-left: none;
+    border-top: 2px dashed rgba(255, 255, 255, 0.26);
+    text-align: left;
+  }
+  .vt-ticket__stub > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; }
+  .vt-ticket__stub-big { font-size: 26px; margin: 0; }
+  .vt-ticket__stub-label:last-child { flex-basis: 100%; margin-top: 4px; }
+  .vt-ticket__barcode { width: 110px; height: 40px; flex: 0 0 auto; }
+}
+@media (max-width: 480px) {
+  .vt-guidelines li { padding-left: 44px; font-size: 13.5px; }
+  .vt-schedule--horizontal { grid-template-columns: 1fr; }
+  .vt-ticket__grid { grid-template-columns: 1fr; gap: 14px; }
+}

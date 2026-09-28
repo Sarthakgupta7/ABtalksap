@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type Resolver } from "react-hook-form";
+import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Form,
@@ -13,6 +14,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -27,23 +29,36 @@ import {
   legalConsentAccepted,
   type LegalConsentValues,
 } from "@/components/legal/legal-consent-fields";
+import { PhoneVerifyField } from "@/components/shared/phone-verify-field";
+import { CityCombobox } from "@/components/marketplace/city-combobox";
+import {
+  INDIA_STATE_NAMES,
+  citiesForState,
+  statesForCity,
+} from "@/data/india-locations";
 import { PHONE_COUNTRIES } from "@/features/hackathon-video/phone-countries";
 import { submitVideoRegistrationAction } from "@/app/actions/hackathon-video-registration-actions";
 import {
   videoRegistrationSchema,
   type VideoRegistrationInput,
 } from "@/lib/validations/hackathon-video";
+import { INDIA_DIALING_CODE } from "@/lib/validations/phone";
 import { cn } from "@/lib/utils";
 
-type Prefill = {
+export type VideoRegistrationPrefill = {
   fullName: string;
   email: string;
+  /** A +91 number this user already OTP-verified on the platform, if any. */
+  verifiedPhone: { countryCode: string; phoneNumber: string } | null;
+  /** False under `next dev`, where OTP is skipped. */
+  phoneOtpRequired: boolean;
 };
 
 type FormValues = {
   phoneCountryCode: string;
   phoneNumber: string;
   city: string;
+  state: string;
   employment: "LEARNER" | "WORKING";
   currentCtc: string;
   portfolioUrl: string;
@@ -54,6 +69,33 @@ type FormValues = {
 const DEFAULT_DIAL = PHONE_COUNTRIES[0]?.dial ?? "+91";
 
 /**
+ * Dial codes for the phone picker. Select values must be unique, so countries
+ * sharing a code (Canada / United States on +1) collapse into one option.
+ * Code first, so it stays visible when the trigger truncates the name.
+ */
+const PHONE_OPTIONS: { code: string; label: string }[] = (() => {
+  const byDial = new Map<string, string[]>();
+  for (const c of PHONE_COUNTRIES) {
+    byDial.set(c.dial, [...(byDial.get(c.dial) ?? []), c.name]);
+  }
+  return [...byDial].map(([code, names]) => ({
+    code,
+    label: `${code} ${names.join(" / ")}`,
+  }));
+})();
+
+/**
+ * Every control in the form shares the Input's height (40px) and radius.
+ * SelectTrigger sizes itself with `data-[size=default]:h-8`, which outranks a
+ * plain `h-10`, so the height is overridden on the same attribute selector.
+ */
+const CONTROL_HEIGHT_CLASS = "h-10 data-[size=default]:h-10 rounded-xl";
+const CONTROL_CLASS = `${CONTROL_HEIGHT_CLASS} w-full min-w-0`;
+/** Same look as `Input`, for the city combobox (which renders its own input). */
+const COMBOBOX_INPUT_CLASS =
+  "h-10 w-full min-w-0 rounded-xl border border-input bg-transparent px-3 py-2 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/20 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 md:text-sm";
+
+/**
  * VideoThon registration form. Rendered inside a dialog on the landing.
  * Identity is displayed from `prefill` (session-derived) — never editable,
  * never sent to the server — the action reads name/email from the session.
@@ -62,7 +104,7 @@ export function VideoRegistrationForm({
   prefill,
   onSuccess,
 }: {
-  prefill: Prefill;
+  prefill: VideoRegistrationPrefill;
   onSuccess: () => void;
 }) {
   const [pending, startTransition] = useTransition();
@@ -70,15 +112,19 @@ export function VideoRegistrationForm({
   const [legalConsent, setLegalConsent] = useState<LegalConsentValues>(
     DEFAULT_LEGAL_CONSENT,
   );
+  // A number verified earlier on the platform is locked and needs no OTP.
+  const lockedPhone = prefill.verifiedPhone;
+  const [phoneVerified, setPhoneVerified] = useState(lockedPhone !== null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(
       videoRegistrationSchema,
     ) as unknown as Resolver<FormValues>,
     defaultValues: {
-      phoneCountryCode: DEFAULT_DIAL,
-      phoneNumber: "",
+      phoneCountryCode: lockedPhone?.countryCode ?? DEFAULT_DIAL,
+      phoneNumber: lockedPhone?.phoneNumber ?? "",
       city: "",
+      state: "",
       employment: "LEARNER",
       currentCtc: "",
       portfolioUrl: "",
@@ -89,12 +135,40 @@ export function VideoRegistrationForm({
   });
 
   const employment = form.watch("employment");
+  const phoneCountryCode = form.watch("phoneCountryCode");
+  const selectedState = form.watch("state");
   const consented = legalConsentAccepted(legalConsent);
+  const stateRequired = phoneCountryCode === INDIA_DIALING_CODE;
 
-  const countryOptions = useMemo(() => PHONE_COUNTRIES, []);
+  // Stable: PhoneVerifyField reports through an effect keyed on this callback.
+  const handlePhoneChange = useCallback(
+    (v: { countryCode: string; phoneNumber: string }) => {
+      const opts = { shouldValidate: form.formState.isSubmitted };
+      form.setValue("phoneCountryCode", v.countryCode, opts);
+      form.setValue("phoneNumber", v.phoneNumber, opts);
+    },
+    [form],
+  );
+
+  function handleStateChange(next: string) {
+    form.setValue("state", next, { shouldValidate: true });
+    // A listed city from another state no longer fits; a typed one is kept.
+    const city = form.getValues("city");
+    if (
+      city &&
+      statesForCity(city).length > 0 &&
+      !citiesForState(next).includes(city)
+    ) {
+      form.setValue("city", "");
+    }
+  }
 
   function onSubmit(values: FormValues) {
     setSubmitError(null);
+    if (!phoneVerified) {
+      setSubmitError("Please verify your phone number with the OTP.");
+      return;
+    }
     if (!consented) {
       setSubmitError("Please accept the Terms of Service and Privacy Policy.");
       return;
@@ -104,6 +178,7 @@ export function VideoRegistrationForm({
       phoneCountryCode: values.phoneCountryCode,
       phoneNumber: values.phoneNumber,
       city: values.city,
+      state: values.state || undefined,
       employment: values.employment,
       currentCtc: values.currentCtc || undefined,
       portfolioUrl: values.portfolioUrl,
@@ -139,23 +214,101 @@ export function VideoRegistrationForm({
           </div>
         </div>
 
-        <div className="vt-form__row-2">
+        {lockedPhone ? (
+          <div className="space-y-2">
+            <Label>Phone number</Label>
+            <div className="vt-form__verified">
+              <span className="vt-form__verified-number">
+                {lockedPhone.countryCode} {lockedPhone.phoneNumber}
+              </span>
+              <span className="vt-form__verified-badge">
+                <CheckCircle2 aria-hidden />
+                Verified
+              </span>
+            </div>
+          </div>
+        ) : (
           <FormField
             control={form.control}
-            name="phoneCountryCode"
+            name="phoneNumber"
+            render={() => (
+              <FormItem className="vt-form__phone">
+                <PhoneVerifyField
+                  label="Phone number"
+                  countryOptions={PHONE_OPTIONS}
+                  required
+                  placeholder="Enter your phone number"
+                  optionalHint={null}
+                  verificationRequired={prefill.phoneOtpRequired}
+                  controlClassName={CONTROL_HEIGHT_CLASS}
+                  disabled={pending}
+                  onChange={handlePhoneChange}
+                  onVerifiedChange={setPhoneVerified}
+                />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
+        <div className="vt-form__row-2 vt-form__row-2--even">
+          <FormField
+            control={form.control}
+            name="city"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Country code</FormLabel>
-                <Select value={field.value} onValueChange={field.onChange}>
+                <FormLabel>City</FormLabel>
+                <FormControl>
+                  <CityCombobox
+                    value={field.value}
+                    state={selectedState}
+                    onChange={(city, impliedState) => {
+                      field.onChange(city);
+                      // Picking a listed city fills its state in.
+                      if (impliedState && impliedState !== selectedState) {
+                        form.setValue("state", impliedState, {
+                          shouldValidate: true,
+                        });
+                      }
+                    }}
+                    disabled={pending}
+                    placeholder={
+                      selectedState ? "Search cities" : "Enter your city"
+                    }
+                    className={COMBOBOX_INPUT_CLASS}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="state"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  State{" "}
+                  {stateRequired ? null : (
+                    <span className="vt-form__hint">(optional outside India)</span>
+                  )}
+                </FormLabel>
+                <Select
+                  value={field.value || null}
+                  onValueChange={(next) => {
+                    if (typeof next === "string") handleStateChange(next);
+                  }}
+                  disabled={pending}
+                >
                   <FormControl>
-                    <SelectTrigger className="w-full min-w-0">
-                      <SelectValue placeholder="+91" />
+                    <SelectTrigger className={CONTROL_CLASS}>
+                      <SelectValue placeholder="Select state" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {countryOptions.map((c) => (
-                      <SelectItem key={c.iso} value={c.dial}>
-                        {c.name} ({c.dial})
+                    {INDIA_STATE_NAMES.map((name) => (
+                      <SelectItem key={name} value={name}>
+                        {name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -164,44 +317,7 @@ export function VideoRegistrationForm({
               </FormItem>
             )}
           />
-          <FormField
-            control={form.control}
-            name="phoneNumber"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Phone number</FormLabel>
-                <FormControl>
-                  <Input
-                    type="tel"
-                    inputMode="tel"
-                    autoComplete="tel-national"
-                    placeholder="98765 43210"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
         </div>
-
-        <FormField
-          control={form.control}
-          name="city"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>City</FormLabel>
-              <FormControl>
-                <Input
-                  autoComplete="address-level2"
-                  placeholder="Mumbai"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         <FormField
           control={form.control}
@@ -212,7 +328,13 @@ export function VideoRegistrationForm({
               <FormControl>
                 <RadioGroup
                   value={field.value}
-                  onValueChange={(v) => field.onChange(v)}
+                  onValueChange={(v) => {
+                    field.onChange(v);
+                    // Clear leftover CTC when they switch back to Learner —
+                    // the field is hidden, so any old value would silently
+                    // ride along into the DB row otherwise.
+                    if (v === "LEARNER") form.setValue("currentCtc", "");
+                  }}
                   className="vt-form__choices"
                 >
                   <label
@@ -252,26 +374,26 @@ export function VideoRegistrationForm({
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="currentCtc"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Current CTC{" "}
-                <span className="vt-form__hint">
-                  {employment === "WORKING"
-                    ? "(required — type NA if you'd rather not share)"
-                    : "(optional)"}
-                </span>
-              </FormLabel>
-              <FormControl>
-                <Input placeholder="e.g. 800000 or NA" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {employment === "WORKING" ? (
+          <FormField
+            control={form.control}
+            name="currentCtc"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Current CTC{" "}
+                  <span className="vt-form__hint">
+                    (required, type NA if you&apos;d rather not share)
+                  </span>
+                </FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g. 800000 or NA" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        ) : null}
 
         <FormField
           control={form.control}
@@ -284,12 +406,12 @@ export function VideoRegistrationForm({
                   type="url"
                   inputMode="url"
                   spellCheck={false}
-                  placeholder="https://behance.net/... or drive.google.com/... or your reel"
+                  placeholder="Enter your portfolio link"
                   {...field}
                 />
               </FormControl>
               <p className="vt-form__hint">
-                Any public link — Drive, Behance, YouTube, Vimeo, personal site.
+                Any public link. Drive, Behance, YouTube, Vimeo, personal site.
               </p>
               <FormMessage />
             </FormItem>

@@ -6,6 +6,8 @@ import {
   isVideothonRegistrationOpen,
 } from "@/features/hackathon-video/config";
 import { getMyVideoRegistration } from "@/features/hackathon-video/get-my-registration";
+import { getVerifiedPhone } from "@/features/hackathon-video/get-verified-phone";
+import { isOtpVerificationRequired } from "@/lib/feature-flags";
 import { HackathonShell } from "@/components/hackathon-v2/hackathon-shell";
 import { FaqAccordion } from "@/components/hackathon-v2/faq-accordion";
 import { VideothonCountdown } from "@/components/hackathon-video/countdown";
@@ -16,25 +18,25 @@ import "@/components/hackathon-video/landing.css";
 export const metadata: Metadata = {
   title: `${VIDEOTHON.name} · ABTalks`,
   description:
-    "A 48-hour hackathon for video editors. Solo. One brief. Ship one cut.",
+    "A 24-hour hackathon for video editors. Solo. One brief. Ship one cut.",
 };
 
 const HIW_STEPS = [
   {
     title: "Register",
-    body: "Sign in with Google, fill a short form. Solo entry — no team code, no group chase.",
+    body: "Sign in with Google, fill a short form. Solo entry, no team code, no group chase.",
   },
   {
     title: "Join the WhatsApp group",
     body: "Every participant joins the group. Kickoff, the brief, judge Q&A and last-minute updates land there first.",
   },
   {
-    title: "Cut for 48 hours",
-    body: "From Friday kickoff to Sunday deadline. Any software, any sources you have rights to. Ship one cut.",
+    title: "Cut for 24 hours",
+    body: "From Friday 8 PM kickoff to Saturday 8 PM deadline. Any software, any sources you have rights to. Ship one cut.",
   },
   {
     title: "Submit before the deadline",
-    body: "One public link — Drive, Behance, YouTube, Vimeo, anything a judge can open. Late is not counted.",
+    body: "One public link. Drive, Behance, YouTube, Vimeo, anything a judge can open. Late is not counted.",
   },
 ];
 
@@ -60,19 +62,19 @@ const TIMELINE = [
 const FAQ_ITEMS = [
   {
     q: "Who's it for?",
-    a: "Anyone who edits video — students, self-taught cutters, in-house editors, freelancers. All skill levels, worldwide.",
+    a: "Anyone who edits video: students, self-taught cutters, in-house editors, freelancers. All skill levels, worldwide.",
   },
   {
     q: "Do I need to be in India?",
-    a: "No. It's a 48-hour online hackathon. Register with any phone number from the country-code list; submit from anywhere.",
+    a: "No. It's a 24-hour online hackathon. Register with any phone number from the country-code list; submit from anywhere.",
   },
   {
     q: "What software can I use?",
-    a: "Anything. Premiere, DaVinci, Final Cut, CapCut, After Effects — whatever ships your best cut. Your call.",
+    a: "Anything. Premiere, DaVinci, Final Cut, CapCut, After Effects. Whatever ships your best cut. Your call.",
   },
   {
     q: "What's the brief?",
-    a: "It lands in the WhatsApp group at kickoff. One prompt everyone edits to — the constraint is what makes it interesting.",
+    a: "It lands in the WhatsApp group at kickoff. One prompt everyone edits to, and the constraint is what makes it interesting.",
   },
   {
     q: "Do I get feedback if I don't win?",
@@ -88,7 +90,7 @@ const RULES = [
   {
     n: "01.",
     title: "Solo entries only",
-    body: "Individual competition. No credited collaborators — one editor, one cut.",
+    body: "Individual competition. No credited collaborators. One editor, one cut.",
     variant: "rule--1",
   },
   {
@@ -99,14 +101,14 @@ const RULES = [
   },
   {
     n: "03.",
-    title: "Everything inside 48 hours",
-    body: "The cut, the grade, the sound, the export — all after kickoff. Pre-built templates disclosed in submission notes.",
+    title: "Everything inside 24 hours",
+    body: "The cut, the grade, the sound, the export. All after kickoff. Pre-built templates disclosed in submission notes.",
     variant: "rule--3",
   },
   {
     n: "04.",
     title: "One link, before the timer",
-    body: "Drive, Behance, YouTube, Vimeo — any public link a judge can open. Late is not counted.",
+    body: "Drive, Behance, YouTube, Vimeo. Any public link a judge can open. Late is not counted.",
     variant: "rule--4",
   },
 ];
@@ -118,9 +120,19 @@ export default async function HackathonPage() {
   const registration = userId ? await getMyVideoRegistration(userId) : null;
   const registered = registration !== null;
   const registrationOpen = isVideothonRegistrationOpen();
+  // Only needed while the form can still open.
+  const verifiedPhone =
+    userId && !registered && registrationOpen
+      ? await getVerifiedPhone(userId)
+      : null;
   const prefill =
     session?.user?.name && session.user.email
-      ? { fullName: session.user.name, email: session.user.email }
+      ? {
+          fullName: session.user.name,
+          email: session.user.email,
+          verifiedPhone,
+          phoneOtpRequired: isOtpVerificationRequired(),
+        }
       : null;
 
   const headerCta = (
@@ -164,7 +176,7 @@ export default async function HackathonPage() {
         <div className="vt-hero__inner">
           <p className="vt-hero__eyebrow" aria-hidden>
             <span className="vt-hero__dot" />
-            REC · 48 HOURS · ONE BRIEF
+            REC · 24 HOURS · ONE BRIEF
           </p>
 
           <h1

@@ -15,6 +15,8 @@ import {
   evaluateGoogleLink,
   onGoogleAccountLinked,
 } from "@/features/resume/import/claim";
+import { authorizeEmailCode, authorizePassword } from "@/lib/email-auth";
+import { isEmailLoginEnabled } from "@/lib/feature-flags";
 //auth is the full config with PrismaAdapter and real Credentials authorize. Used everywhere else.
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -72,49 +74,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         };
       },
     }),
-    ...(process.env.ENABLE_DEV_AUTH === "true"
-      ? [
-          Credentials({
-            id: "dev-credentials",
-            name: "Dev Login",
-            credentials: {
-              email: { label: "Email", type: "email" },
-              password: { label: "Password", type: "password" },
-            },
-            async authorize(credentials) {
-              try {
-                if (!credentials?.email || !credentials?.password) return null;
-
-                const user = await prisma.user.findUnique({
-                  where: { email: String(credentials.email) },
-                  select: {
-                    id: true,
-                    email: true,
-                    name: true,
-                    role: true,
-                    password: true,
-                    deletedAt: true,
-                    disabledAt: true,
-                  },
-                });
-
-                if (!user || !user.password || user.deletedAt || user.disabledAt) return null;
-                if (user.password !== String(credentials.password)) return null;
-
-                return {
-                  id: user.id,
-                  email: user.email,
-                  name: user.name,
-                  role: user.role,
-                };
-              } catch (error) {
-                console.error("DEV LOGIN AUTHORIZE ERROR:", error);
-                throw error;
-              }
-            },
-          }),
-        ]
-      : []),
+    /**
+     * Plan 154. Candidate sign-in by emailed code — and first sign-in creates
+     * the account, as Google does. Rules live in lib/email-auth.ts.
+     */
+    Credentials({
+      id: "email-code",
+      name: "Email code",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        code: { label: "Code", type: "text" },
+      },
+      authorize: (credentials) => authorizeEmailCode(credentials),
+    }),
+    /**
+     * Plan 154. Password sign-in for both doors; `audience` says which, and a
+     * door only opens its own accounts. Replaces the old "dev-credentials"
+     * provider, which compared plain text.
+     */
+    Credentials({
+      id: "password",
+      name: "Password",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+        audience: { label: "Audience", type: "text" },
+      },
+      authorize: (credentials, request) =>
+        authorizePassword(credentials, request),
+    }),
     ...(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET
       ? [
           require("next-auth/providers/google").default({
@@ -128,6 +116,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             // `evaluateGoogleLink` narrows this to exactly that case and denies
             // every other existing-email link, as Auth.js did before.
             allowDangerousEmailAccountLinking: true,
+            // Plan 154 — see auth.config.ts and the signIn callback below.
+            allowDangerousEmailAccountLinking: isEmailLoginEnabled(),
           }),
         ]
       : []),
@@ -151,6 +141,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // The exact outcome Auth.js produced before linking was enabled.
         if (decision === "deny") return "/login?error=OAuthAccountNotLinked";
       }
+      // Plan 154: Google is about to attach to an account created another way
+      // (emailed code or password). Allowed only for a live candidate account
+      // whose address Google itself has verified. A recruiter must not slip
+      // into the candidate door this way — without this, linking would sign
+      // them in on /login and send them to candidate registration.
+      if (isEmailLoginEnabled() && account?.provider === "google" && user?.email) {
+        const existing = await prisma.user.findFirst({
+          where: {
+            email: { equals: user.email.trim().toLowerCase(), mode: "insensitive" },
+          },
+          orderBy: { createdAt: "asc" },
+          select: {
+            deletedAt: true,
+            disabledAt: true,
+            recruiterProfile: { select: { id: true } },
+            accounts: { where: { provider: "google" }, select: { id: true } },
+          },
+        });
+        if (existing && existing.accounts.length === 0) {
+          if (existing.deletedAt || existing.disabledAt) return false;
+          if (existing.recruiterProfile) return "/login?error=RecruiterAccount";
+          const verified = (profile as { email_verified?: boolean } | undefined)
+            ?.email_verified;
+          if (verified !== true) return false;
+        }
+      }
+
+      if (!user?.id) return true;
+      const row = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { deletedAt: true, disabledAt: true },
+      });
+      if (row?.deletedAt || row?.disabledAt) return false;
       return true;
     },
     async session({ session, token }) {
@@ -161,6 +184,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.isAdmin as boolean;
       }
 
+      const authTime =
+        typeof token.authTime === "number" ? token.authTime : undefined;
       const userId = token.id as string | undefined;
       if (userId) {
         const row = await prisma.user.findUnique({
@@ -171,14 +196,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             sessionInvalidatedAt: true,
           },
         });
+        // authTime, not iat: Auth.js re-stamps iat on every refresh, so a
+        // revoked session compared by iat came back after one refresh.
         if (
           row?.deletedAt ||
           row?.disabledAt ||
-          isJwtInvalidated(token.iat, row?.sessionInvalidatedAt)
+          isJwtInvalidated(authTime ?? token.iat, row?.sessionInvalidatedAt)
         ) {
           return { ...session, user: undefined as never };
         }
       }
+      // Only a real sign-in time is exposed: it answers "signed in recently?"
+      // for setting a first password, and an estimate must never say yes.
+      session.authTime = token.authTimeEstimated === true ? undefined : authTime;
       return session;
     },
   },

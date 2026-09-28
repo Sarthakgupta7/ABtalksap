@@ -5,6 +5,7 @@ import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
+  deleteImportAction,
   getImportStatusAction,
   queueParseAction,
   registerUploadsAction,
@@ -258,6 +259,24 @@ export function ImportTable({
     );
   }
 
+  function deleteRows(which: "selected") {
+    if (
+      !window.confirm(
+        which === "selected"
+          ? `Delete ${selectedIds.length} import(s)? This also removes stub accounts for students who have not yet signed in. This cannot be undone.`
+          : `Delete ALL imports? This also removes stub accounts for students who have not yet signed in. This cannot be undone.`,
+      )
+    )
+      return;
+    void run(
+      () => deleteImportAction({ ids: selectedIds }),
+      (d) =>
+        d.usersRemoved > 0
+          ? `${d.deleted} import(s) deleted, ${d.usersRemoved} stub account(s) removed.`
+          : `${d.deleted} import(s) deleted.`,
+    );
+  }
+
   function toggle(id: string) {
     setSelected((s) => {
       const next = new Set(s);
@@ -406,6 +425,14 @@ export function ImportTable({
           >
             Register all parsed ({counts.PARSED})
           </Button>
+          <Button
+            variant="destructive"
+            disabled={busy || selectedIds.length === 0}
+            onClick={() => deleteRows("selected")}
+            className="ml-auto border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+          >
+            Delete selected ({selectedIds.length})
+          </Button>
         </div>
       </section>
 
@@ -479,6 +506,22 @@ export function ImportTable({
                     onResolve={(email) =>
                       void run(() => resolveEmailAction({ id: row.id, email }), (d) => `Email set to ${d.email}.`)
                     }
+                    onDelete={() => {
+                      if (
+                        window.confirm(
+                          row.status === "REGISTERED"
+                            ? `Delete this import? If the student has not yet signed in, their stub account will also be removed.`
+                            : `Delete this import? This cannot be undone.`,
+                        )
+                      )
+                        void run(
+                          () => deleteImportAction({ ids: [row.id] }),
+                          (d) =>
+                            d.usersRemoved > 0
+                              ? `Import deleted, stub account removed.`
+                              : `Import deleted.`,
+                        );
+                    }}
                   />
                 ))}
               </tbody>
@@ -505,6 +548,7 @@ function ImportRow({
   onParse,
   onRetry,
   onResolve,
+  onDelete,
 }: {
   row: ImportRowView;
   selected: boolean;
@@ -513,6 +557,7 @@ function ImportRow({
   onParse: () => void;
   onRetry: () => void;
   onResolve: (email: string) => void;
+  onDelete: () => void;
 }) {
   const [email, setEmail] = useState(row.emailCandidates[0] ?? row.email ?? "");
 
@@ -577,6 +622,17 @@ function ImportRow({
         {row.status === "FAILED" && (
           <Button size="sm" variant="outline" disabled={busy} onClick={onRetry}>
             Retry
+          </Button>
+        )}
+        {row.status !== "CLAIMED" && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={onDelete}
+            className="ml-1 border-red-200 text-red-600 hover:bg-red-50"
+          >
+            Delete
           </Button>
         )}
       </td>

@@ -25,6 +25,7 @@ import {
 } from "@/features/resume/import/status";
 import {
   createOrGetImport,
+  deleteImports,
   findImportByHash,
   hasPendingImportWork,
   queueImports,
@@ -204,6 +205,42 @@ export async function retryFailedAction(raw: unknown): Promise<Result<{ queued: 
   if (queued > 0) startDrain();
   revalidatePath(PAGE);
   return { ok: true, data: { queued } };
+}
+
+/* ─── 2b. Delete ───────────────────────────────────────────────────────────────── */
+
+/**
+ * Hard-delete one or more import rows.
+ *
+ * - Cleans up blob storage for the deleted rows.
+ * - If a REGISTERED row’s user was created solely by the import (no linked
+ *   Google Account), that stub user is also deleted so the email is free.
+ * - CLAIMED rows are silently skipped — the student already signed in.
+ */
+export async function deleteImportAction(
+  raw: unknown,
+): Promise<Result<{ deleted: number; usersRemoved: number }>> {
+  const admin = await getAdminContext();
+  if (!admin) return NOT_AUTHORISED;
+  const parsed = selectionSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, message: "Invalid input" };
+
+  const { deleted, blobPathnames, stubUserIds } = await deleteImports(parsed.data as Selection);
+
+  // Clean up blob storage (fire-and-forget per file; failures are logged, not fatal).
+  await Promise.allSettled(blobPathnames.map((p) => deleteResumeFile(p)));
+
+  // Remove stub users that were created only for this import.
+  let usersRemoved = 0;
+  if (stubUserIds.length > 0) {
+    const db = writeClient();
+    const res = await db.user.deleteMany({ where: { id: { in: stubUserIds } } });
+    usersRemoved = res.count;
+  }
+
+  await audit(admin.userId, "RESUME_IMPORT_DELETE", { deleted, usersRemoved });
+  revalidatePath(PAGE);
+  return { ok: true, data: { deleted, usersRemoved } };
 }
 
 /* ─── 4. Resolve email ───────────────────────────────────────────────────── */

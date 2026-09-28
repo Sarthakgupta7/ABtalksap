@@ -339,10 +339,22 @@ async function listDatabricksAiAttemptTimes(userId: string): Promise<Date[]> {
   return rows.map((r) => r.submittedAt ?? r.createdAt);
 }
 
+/** LangChain & LangGraph mission runs — every run, pass or fail. */
+async function listLangchainAttemptTimes(userId: string): Promise<Date[]> {
+  const rows = await prisma.activityAttempt.findMany({
+    where: {
+      enrollment: { userId },
+      activityId: { startsWith: "act_lcg_day_" },
+    },
+    select: { submittedAt: true, createdAt: true },
+  });
+  return rows.map((r) => r.submittedAt ?? r.createdAt);
+}
+
 /**
  * Every submission the hub heatmap and streak card count, across all tracks
  * the user can be in: 60-Day Challenge, AI Cohort, Databricks, DS Architect,
- * Power BI, Snowflake, Databricks Data & AI.
+ * Power BI, Snowflake, Databricks Data & AI, LangChain & LangGraph.
  */
 export async function listHubSubmissionTimes(
   userId: string,
@@ -355,6 +367,7 @@ export async function listHubSubmissionTimes(
     powerBi,
     snowflake,
     databricksAi,
+    langchain,
   ] = await Promise.all([
     listChallengeSubmissionTimes(userId),
     listProgramMissionTimes(userId),
@@ -363,6 +376,7 @@ export async function listHubSubmissionTimes(
     listPowerBiAttemptTimes(userId),
     listSnowflakeAttemptTimes(userId),
     listDatabricksAiAttemptTimes(userId),
+    listLangchainAttemptTimes(userId),
   ]);
   return [
     ...challenge,
@@ -372,6 +386,7 @@ export async function listHubSubmissionTimes(
     ...powerBi,
     ...snowflake,
     ...databricksAi,
+    ...langchain,
   ];
 }
 

@@ -68,6 +68,67 @@ function selectionWhere(sel: Selection): Prisma.ResumeImportWhereInput {
   return "ids" in sel ? { id: { in: sel.ids } } : {};
 }
 
+/**
+ * Hard-delete import rows. Returns blob pathnames to clean up from storage and
+ * user IDs of stub accounts that were created by the import but have no linked
+ * Account (i.e. the student never signed in via Google), so the caller can
+ * optionally delete those users too.
+ *
+ * CLAIMED rows are skipped — the student already signed in and owns the account.
+ */
+export async function deleteImports(sel: Selection): Promise<{
+  deleted: number;
+  blobPathnames: string[];
+  stubUserIds: string[];
+}> {
+  const db = writeClient();
+
+  // Fetch rows before deletion so we can return pathnames / user ids.
+  const rows = await db.resumeImport.findMany({
+    where: {
+      ...selectionWhere(sel),
+      // Never auto-delete a CLAIMED row — the student is a real user.
+      status: { not: "CLAIMED" },
+    },
+    select: {
+      id: true,
+      blobPathname: true,
+      registeredUserId: true,
+    },
+  });
+
+  if (rows.length === 0) return { deleted: 0, blobPathnames: [], stubUserIds: [] };
+
+  const ids = rows.map((r) => r.id);
+
+  // Collect candidate stub user IDs (only REGISTERED imports have a userId).
+  const candidateUserIds = [...new Set(
+    rows.map((r) => r.registeredUserId).filter((id): id is string => id !== null),
+  )];
+
+  // Of those, only keep users with no linked Account (never signed in via Google).
+  let stubUserIds: string[] = [];
+  if (candidateUserIds.length > 0) {
+    const stubs = await db.user.findMany({
+      where: {
+        id: { in: candidateUserIds },
+        accounts: { none: {} },
+      },
+      select: { id: true },
+    });
+    stubUserIds = stubs.map((u) => u.id);
+  }
+
+  // Delete the import rows.
+  const { count } = await db.resumeImport.deleteMany({ where: { id: { in: ids } } });
+
+  const blobPathnames = rows
+    .map((r) => r.blobPathname)
+    .filter((p): p is string => p !== null);
+
+  return { deleted: count, blobPathnames, stubUserIds };
+}
+
 /** UPLOADED / FAILED → QUEUED. `register` also asks for registration after the parse. */
 export async function queueImports(
   sel: Selection,

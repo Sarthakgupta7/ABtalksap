@@ -205,8 +205,11 @@ export function PhoneVerifyField({
   const [verifying, setVerifying] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  /** Set only when the server says this is the team test number: skip the SMS widget. */
+  const [testMode, setTestMode] = useState(false);
 
   const isIndia = countryCode === INDIA_DIALING_CODE;
+  const skipWidget = IS_BYPASS || testMode;
 
   // Keep the parent in sync with the current value.
   useEffect(() => {
@@ -238,6 +241,7 @@ export function PhoneVerifyField({
     setStep("idle");
     setOtp("");
     setPhoneError(null);
+    setTestMode(false);
   }, []);
 
   function handleCountryChange(next: string | null) {
@@ -266,6 +270,13 @@ export function PhoneVerifyField({
       if (!available.ok) {
         setPhoneError(available.message);
         toast.error(available.message);
+        return;
+      }
+      if (available.testNumber) {
+        setTestMode(true);
+        setStep("sent");
+        setCooldown(RESEND_COOLDOWN_SECONDS);
+        toast.message("Test number — enter the team code");
         return;
       }
       if (IS_BYPASS) {
@@ -297,6 +308,11 @@ export function PhoneVerifyField({
 
   async function handleResend() {
     if (cooldown > 0) return;
+    if (testMode) {
+      setCooldown(RESEND_COOLDOWN_SECONDS);
+      toast.message("Test number — enter the team code");
+      return;
+    }
     if (IS_BYPASS) {
       setCooldown(RESEND_COOLDOWN_SECONDS);
       toast.message("Dev mode — enter code 1234");
@@ -327,7 +343,7 @@ export function PhoneVerifyField({
     setVerifying(true);
     try {
       let accessToken: string | undefined;
-      if (!IS_BYPASS) {
+      if (!skipWidget) {
         lastAccessToken = null;
         await waitForFn(() => window.verifyOtp);
         const token = await new Promise<string | null>((resolve, reject) => {
@@ -347,7 +363,7 @@ export function PhoneVerifyField({
       const res = await verifyOtpAction({
         countryCode,
         phoneNumber,
-        ...(IS_BYPASS ? { otp } : { accessToken }),
+        ...(skipWidget ? { otp } : { accessToken }),
       });
       if (!res.ok) {
         toast.error(res.message);

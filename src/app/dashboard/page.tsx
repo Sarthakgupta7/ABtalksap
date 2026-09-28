@@ -6,6 +6,7 @@ import { DaySkySection } from "@/components/dashboard-hub/day-sky";
 import { CareerGuidance } from "@/components/dashboard-hub/career-guidance";
 import { getCareerGuidance } from "@/features/career-guidance/get-career-guidance";
 import { FaqSection } from "@/components/dashboard-hub/faq-section";
+import { STAGE_FAQ } from "@/components/dashboard-hub/faq-content";
 import {
   StageSwitcher,
   type StageKey,
@@ -36,7 +37,6 @@ const TRACK_PATH: Record<Domain, string> = {
 
 const JOIN_ERROR_MESSAGE: Record<string, string> = {
   no_user: "Your session expired. Please sign in again.",
-  no_challenge: "That track isn't open yet. Please try again later.",
   internal_error: "We couldn't add that track. Please try again.",
 };
 
@@ -77,9 +77,23 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     getCareerGuidance(session.user.id, []),
     getStageData(session.user.id, data.enrollments, data.heatmap.cells),
   ]);
-  const stageData = previewEnrolled
+  const enrolledStage = previewEnrolled
     ? { ...loadedStage, sixty: PREVIEW_SIXTY }
     : loadedStage;
+  // Dev only: DASHBOARD_PREVIEW_PROFILE_COMPLETE=1 shows a 100% profile.
+  const previewProfileDone =
+    process.env.NODE_ENV !== "production" &&
+    process.env.DASHBOARD_PREVIEW_PROFILE_COMPLETE === "1";
+  const stageData = previewProfileDone
+    ? {
+        ...enrolledStage,
+        profile: {
+          ...enrolledStage.profile,
+          score: 100,
+          sections: enrolledStage.profile.sections.map((x) => ({ ...x, complete: true, fraction: 1 })),
+        },
+      }
+    : enrolledStage;
 
   const firstName =
     data.profile?.fullName.split(/\s+/)[0] ??
@@ -136,7 +150,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     stages.find((s) => s.pct < 100)?.key ?? "hired";
 
   return (
-    <DashboardShell user={shellUser} isAdmin={isAdmin} collapsible>
+    <DashboardShell user={shellUser} isAdmin={isAdmin} collapsible startCollapsed>
       <DaySkySection
         initialMinute={istMinute}
         frozen={skyOverride !== null}
@@ -161,10 +175,12 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
           <div className="mt-12">
             <StageSwitcher
+              profileScore={stageData.profile.score}
               stages={stages}
               current={currentStage}
               panels={{
                 build: (
+                  <>
                   <BuildSkillsPanel
                     sixty={stageData.sixty}
                     trackHref={trackHref}
@@ -181,15 +197,21 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                     showSnowflake={data.hasSnowflakeAccess}
                     showDatabricksAi={data.hasDatabricksAiAccess}
                   />
+                  <FaqSection items={STAGE_FAQ.build} />
+                  </>
                 ),
                 test: (
+                  <>
                   <TestSkillsPanel
                     data={stageData}
                     hasActiveTrack={Boolean(firstActive)}
                     trackHref={trackHref}
                   />
+                  <FaqSection items={STAGE_FAQ.test} />
+                  </>
                 ),
                 hired: (
+                  <>
                   <GetHiredPanel
                     profile={stageData.profile}
                     guidance={
@@ -202,12 +224,13 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                       />
                     }
                   />
+                  <FaqSection items={STAGE_FAQ.hired} />
+                  </>
                 ),
               }}
             />
           </div>
 
-          <FaqSection />
         </div>
       </DaySkySection>
     </DashboardShell>

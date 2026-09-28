@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { Check, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type StageKey = "build" | "test" | "hired";
@@ -61,6 +63,8 @@ const ILLUSTRATIONS: Record<StageKey, () => React.JSX.Element> = {
 
 type StageSwitcherProps = {
   stages: StageSummary[];
+  /** Profile strength 0–100 — drives the "Complete your profile" tile. */
+  profileScore: number;
   /** The first unfinished stage — gets "You are here" and opens by default. */
   current: StageKey;
   panels: Record<StageKey, ReactNode>;
@@ -72,7 +76,7 @@ type StageSwitcherProps = {
  * anchor (#test-skills) or any element inside a panel (#events, #domains…),
  * so the header's section links keep working whichever stage is open.
  */
-export function StageSwitcher({ stages, current, panels }: StageSwitcherProps) {
+export function StageSwitcher({ stages, current, panels, profileScore }: StageSwitcherProps) {
   const [selected, setSelected] = useState<StageKey>(current);
   const railRef = useRef<HTMLDivElement>(null);
 
@@ -116,7 +120,8 @@ export function StageSwitcher({ stages, current, panels }: StageSwitcherProps) {
     <>
       <div ref={railRef} id="stages" className="scroll-mt-24">
         <div className="relative rounded-[28px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.46)_0%,rgba(255,255,255,0.28)_100%)] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(255,255,255,0.35),0_20px_44px_-20px_rgba(3,83,95,0.4)] backdrop-blur-[10px] backdrop-saturate-[1.3] sm:p-3">
-          <div role="tablist" aria-label="Your stages" className="grid gap-2.5 sm:gap-3 xl:grid-cols-3">
+          <div role="tablist" aria-label="Your stages" className="grid gap-2.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
+            <ProfileTile score={profileScore} />
             {stages.map((s) => {
               const Illustration = ILLUSTRATIONS[s.key];
               const active = s.key === selected;
@@ -130,7 +135,7 @@ export function StageSwitcher({ stages, current, panels }: StageSwitcherProps) {
                   aria-controls={s.anchor}
                   onClick={() => choose(s)}
                   className={cn(
-                    "flex items-center gap-4 rounded-2xl p-4 text-left transition-[background-color,box-shadow,transform] duration-200 ease-[var(--ease-spark)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:p-5",
+                    "flex items-center gap-3 rounded-2xl px-3.5 py-3 text-left transition-[background-color,box-shadow,transform] duration-200 ease-[var(--ease-spark)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
                     active
                       ? "border border-white/80 bg-white/[0.78] text-black shadow-[0_14px_30px_-12px_rgba(3,40,45,0.45)] backdrop-blur-md"
                       : "border border-white/15 bg-[linear-gradient(160deg,var(--tab-idle-from,rgba(63,117,121,0.74))_0%,var(--tab-idle-to,rgba(45,95,99,0.72))_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-md hover:-translate-y-0.5",
@@ -138,7 +143,7 @@ export function StageSwitcher({ stages, current, panels }: StageSwitcherProps) {
                 >
                   <span
                     className={cn(
-                      "flex size-14 shrink-0 items-center justify-center rounded-xl",
+                      "flex size-12 shrink-0 items-center justify-center rounded-xl [&_svg]:size-8",
                       active ? "bg-[#E8F3F2]" : "bg-white shadow-[0_4px_10px_-4px_rgba(0,0,0,0.25)]",
                     )}
                     aria-hidden="true"
@@ -149,14 +154,14 @@ export function StageSwitcher({ stages, current, panels }: StageSwitcherProps) {
                     <span className="flex items-center gap-2 text-xs font-semibold tracking-[0.14em]">
                       <span className={active ? "text-[#03535F]" : "text-white/85"}>{s.number}</span>
                     </span>
-                    <span className="mt-1 block font-heading text-2xl font-bold leading-tight">
+                    <span className="mt-0.5 block font-heading text-xl font-bold leading-tight">
                       {s.first}{" "}
                       <span className={active ? "text-[#03535F]" : undefined}>{s.accent}</span>
                     </span>
-                    <span className="mt-2 flex items-center gap-2.5 text-sm">
+                    <span className="mt-1.5 flex items-center gap-2 text-sm">
                       <span className="font-bold">{s.pct}%</span>
                       <span
-                        className={cn("h-1.5 w-16 overflow-hidden rounded-full sm:w-20", active ? "bg-[#E1E7E7]" : "bg-white/25")}
+                        className={cn("h-1.5 w-12 shrink-0 overflow-hidden rounded-full", active ? "bg-[#E1E7E7]" : "bg-white/25")}
                         aria-hidden="true"
                       >
                         <span
@@ -174,7 +179,7 @@ export function StageSwitcher({ stages, current, panels }: StageSwitcherProps) {
             })}
           </div>
 
-          <StageRoad stages={stages} selected={selected} />
+          <StageRoad stages={stages} selected={selected} profileDone={profileScore >= 100} />
         </div>
       </div>
 
@@ -200,13 +205,15 @@ export function StageSwitcher({ stages, current, panels }: StageSwitcherProps) {
    y is real pixels). A map pin marks the selected stage; switching
    stages walks it along the curve in small hops. */
 
-const ROAD_H = 40;
-// Start of the road → middle → just short of the goal.
-const PIN_STOPS: Record<StageKey, number> = { build: 22, test: 500, hired: 945 };
+const ROAD_H = 30;
+// Under the three stage tiles (the profile tile sits first in the rail).
+const PIN_STOPS: Record<StageKey, number> = { build: 330, test: 600, hired: 945 };
+/** Start of the road, under the Complete your profile tile. */
+const PROFILE_STOP = 30;
 
 /** Height of the road at x (0–1000), in px from the top of the road box. */
 function roadY(x: number): number {
-  return 21 + 12 * Math.sin((x / 1000) * Math.PI * 4 + 0.4);
+  return 16 + 8 * Math.sin((x / 1000) * Math.PI * 4 + 0.4);
 }
 
 const ROAD_D = Array.from({ length: 101 }, (_, i) => {
@@ -214,13 +221,23 @@ const ROAD_D = Array.from({ length: 101 }, (_, i) => {
   return `${i === 0 ? "M" : "L"}${x} ${roadY(x).toFixed(2)}`;
 }).join(" ");
 
-function StageRoad({ stages, selected }: { stages: StageSummary[]; selected: StageKey }) {
-  const [pin, setPin] = useState({ x: PIN_STOPS[selected], hop: 0 });
-  const xRef = useRef(PIN_STOPS[selected]);
+function StageRoad({
+  stages,
+  selected,
+  profileDone,
+}: {
+  stages: StageSummary[];
+  selected: StageKey;
+  /** Until the profile is complete the pin waits at the start (under it). */
+  profileDone: boolean;
+}) {
+  const target = profileDone ? PIN_STOPS[selected] : PROFILE_STOP;
+  const [pin, setPin] = useState({ x: target, hop: 0 });
+  const xRef = useRef(target);
 
   useEffect(() => {
     const from = xRef.current;
-    const to = PIN_STOPS[selected];
+    const to = target;
     if (from === to) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduce) {
@@ -248,7 +265,7 @@ function StageRoad({ stages, selected }: { stages: StageSummary[]; selected: Sta
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [selected]);
+  }, [target]);
 
   const label = stages.find((s) => s.key === selected);
   return (
@@ -288,5 +305,61 @@ function StageRoad({ stages, selected }: { stages: StageSummary[]; selected: Sta
         </svg>
       </span>
     </div>
+  );
+}
+
+/* ─── Complete your profile (first tile; links to /profile) ────
+   Incomplete: a warm red alert tile with a pulsing dot to pull the eye.
+   Complete: calm white with a check in the corner and "100% completed". */
+
+function ProfileTile({ score }: { score: number }) {
+  const done = score >= 100;
+  return (
+    <Link
+      href="/profile"
+      className={cn(
+        "relative flex items-center gap-3 rounded-2xl px-3.5 py-3 text-left transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+        done
+          ? "border border-white/80 bg-white/[0.78] text-black shadow-[0_14px_30px_-12px_rgba(3,40,45,0.35)] backdrop-blur-md"
+          : "border border-[#FFB3A7] bg-[linear-gradient(150deg,#FFF1EE_0%,#FFD9D2_100%)] text-[#5A1208] shadow-[0_12px_28px_-12px_rgba(224,58,40,0.55)]",
+      )}
+    >
+      {done ? (
+        <span className="absolute right-2.5 top-2.5 flex size-5 items-center justify-center rounded-full bg-[#2BD4A0] text-[#053B33]" aria-label="Completed">
+          <Check className="size-3" strokeWidth={3} />
+        </span>
+      ) : (
+        <span className="absolute right-3 top-3 flex size-2.5" aria-hidden="true">
+          <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#E5392A] opacity-70" />
+          <span className="relative inline-flex size-2.5 rounded-full bg-[#E5392A]" />
+        </span>
+      )}
+      <span
+        className={cn(
+          "flex size-12 shrink-0 items-center justify-center rounded-xl",
+          done ? "bg-[#E8F3F2] text-[#03535F]" : "bg-white text-[#E5392A] shadow-[0_4px_10px_-4px_rgba(224,58,40,0.45)]",
+        )}
+        aria-hidden="true"
+      >
+        <UserRound className="size-7" strokeWidth={2} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className={cn("block text-xs font-semibold tracking-[0.14em]", done ? "text-[#03535F]" : "text-[#C62D1F]")}>
+          {done ? "DONE" : "START HERE"}
+        </span>
+        <span className="mt-0.5 block font-heading text-xl font-bold leading-tight">
+          Complete <span className={done ? "text-[#03535F]" : "text-[#C62D1F]"}>profile</span>
+        </span>
+        <span className="mt-1.5 flex items-center gap-2 text-sm">
+          <span className="font-bold">{score}%</span>
+          <span className={cn("h-1.5 w-12 shrink-0 overflow-hidden rounded-full", done ? "bg-[#E1E7E7]" : "bg-white/70")} aria-hidden="true">
+            <span className={cn("block h-full rounded-full", done ? "bg-[#03535F]" : "bg-[#E5392A]")} style={{ width: `${score}%` }} />
+          </span>
+          <span className={cn("truncate text-xs", done ? "text-[#4B4B4B]" : "text-[#8A2A1E]")}>
+            {done ? "completed" : "finish it now"}
+          </span>
+        </span>
+      </span>
+    </Link>
   );
 }

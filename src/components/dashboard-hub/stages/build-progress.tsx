@@ -5,7 +5,6 @@ import { AlertCircle, ArrowRight, BarChart3, Code2, Flame, Network, Sparkles } f
 import type { SixtyDay } from "@/features/dashboard/get-stage-data";
 import type { HubEnrollment } from "@/features/dashboard/get-hub-data";
 import type { ActivityStreak, WeekDayTick } from "@/features/dashboard/compute-activity-streak";
-import { JoinClaudeButton } from "@/components/dashboard-hub/join-claude-button";
 import { cn } from "@/lib/utils";
 import { STAGE_CARD } from "./stage-ui";
 import "./stages.css";
@@ -448,47 +447,41 @@ export function StreakBox({ streak }: { streak: ActivityStreak }) {
 
 /* ─── Continue learning ──────────────────────────────────────── */
 
-export function ContinueLearning({
-  enrollments,
-  joinable,
-}: {
-  enrollments: HubEnrollment[];
-  /** Tracks they can still join (not joined, not removed from). */
-  joinable: Domain[];
-}) {
+export function ContinueLearning({ enrollments }: { enrollments: HubEnrollment[] }) {
   return (
     <section
       id="your-challenge"
-      className="flex scroll-mt-24 flex-col rounded-3xl bg-[linear-gradient(170deg,#5C8C8F_0%,#467679_100%)] p-5 text-white shadow-[0_18px_40px_-22px_rgba(3,83,95,0.9)]"
+      className={cn(STAGE_CARD, "flex scroll-mt-24 flex-col p-5 text-black")}
     >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7CE8C8]">Continue learning</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#008C94]">Continue learning</p>
       <h3 className="mt-2 font-heading text-2xl font-bold leading-tight">Pick up your track</h3>
 
       <ul className="mt-4 space-y-3">
         {enrollments.map((e) => {
-          const { name, path, Icon } = TRACK_META[e.domain];
+          const { name, path } = TRACK_META[e.domain];
           const done = e.status === "COMPLETED";
           const pct = done ? 100 : Math.min(100, Math.round((e.daysCompleted / 60) * 100));
           return (
             <li key={e.id}>
               <Link
                 href={path}
-                className="group flex items-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-3.5 text-white transition-colors hover:bg-white/15"
+                className="group flex items-center gap-3 rounded-2xl bg-[#DCE8E9] p-2.5 text-black transition-colors hover:bg-[#D2E2E3]"
               >
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/15" aria-hidden="true">
-                  <Icon className="size-5" />
-                </span>
+                {/* eslint-disable-next-line @next/next/no-img-element -- small static thumbnail */}
+                <img src="/dashboard/track-thumb.png" alt="" className="size-[60px] shrink-0 rounded-xl object-cover" />
                 <span className="min-w-0 flex-1">
-                  <span className="block font-heading font-bold leading-tight">{name}</span>
-                  <span className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-white/80">
+                  <span className="block truncate font-heading text-[15px] font-bold leading-tight">{name}</span>
+                  <span className="mt-0.5 block text-xs text-[#4B4B4B]">
                     {done ? "Completed · 60 of 60" : `Day ${Math.min(60, e.daysCompleted + 1)} of 60`}
-                    <span className="flex items-center gap-1 text-xs font-bold text-white">
+                  </span>
+                  <span className="mt-1.5 flex items-center gap-2">
+                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#AFC0C1]" aria-hidden="true">
+                      <span className="block h-full rounded-full bg-[#03535F]" style={{ width: `${pct}%` }} />
+                    </span>
+                    <span className="flex shrink-0 items-center gap-0.5 text-xs font-semibold text-[#03535F]">
                       {done ? "View" : "Continue"}
                       <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                     </span>
-                  </span>
-                  <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-white/25" aria-hidden="true">
-                    <span className="block h-full rounded-full bg-[#2BD4A0]" style={{ width: `${pct}%` }} />
                   </span>
                 </span>
               </Link>
@@ -496,38 +489,6 @@ export function ContinueLearning({
           );
         })}
       </ul>
-
-      {joinable.length > 0 ? (
-        <div id="domains" className="mt-auto scroll-mt-24 pt-5">
-          <p className="text-xs font-semibold text-white/75">Add another track</p>
-          <ul className="mt-2 flex flex-wrap gap-2">
-            {joinable.map((d) => {
-              const { name, Icon } = TRACK_META[d];
-              const chip =
-                "inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20";
-              return (
-                <li key={d}>
-                  {d === "CLAUDE" ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/10 py-1.5 pl-3 pr-1 text-xs font-semibold text-white">
-                      <Icon className="size-3.5" aria-hidden="true" />
-                      {name}
-                      <JoinClaudeButton
-                        withArrow
-                        className="ml-1 inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 hover:bg-white/30 disabled:opacity-60"
-                      />
-                    </span>
-                  ) : (
-                    <Link href={`/register?domain=${d}`} className={chip}>
-                      <Icon className="size-3.5" aria-hidden="true" />
-                      {name}
-                    </Link>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ) : null}
     </section>
   );
 }

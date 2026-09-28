@@ -4,7 +4,7 @@ import { useState } from "react";
 import { DASHBOARD_FAQ } from "./faq-content";
 import { cn } from "@/lib/utils";
 
-export function FaqSection() {
+export function FaqSection({ items = DASHBOARD_FAQ }: { items?: { q: string; a: string }[] } = {}) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
@@ -24,7 +24,7 @@ export function FaqSection() {
 
         {/* Right column: accordion cards */}
         <div className="space-y-3">
-          {DASHBOARD_FAQ.map((item, index) => {
+          {items.map((item, index) => {
             const isOpen = openIndex === index;
             const panelId = `faq-panel-${index}`;
 

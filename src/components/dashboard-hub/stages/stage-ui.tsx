@@ -58,15 +58,18 @@ export function StageHeader({
   accent,
   sub,
   aside,
+  wide = false,
 }: {
   title: string;
   accent: string;
   sub: string;
   aside?: ReactNode;
+  /** Let the title and sub run the full width on one line each. */
+  wide?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div className="max-w-xl">
+      <div className={wide ? "min-w-0" : "max-w-xl"}>
         <h2 className="font-heading text-3xl font-bold tracking-tight text-black sm:text-[40px] sm:leading-[1.1]">
           {title} <Accent>{accent}</Accent>
         </h2>

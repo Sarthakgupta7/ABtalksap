@@ -133,7 +133,9 @@ export type ProgramCandidateRow = {
   graduationYear: number | null;
   skills: string[];
   updatedAt: Date;
-  cohort: { id: string; startsAt: Date };
+  /** The learner's own Day-1 anchor. Day math reads this, not cohort.startsAt (plan 157). */
+  startedAt: Date;
+  cohort: { id: string; startsAt: Date | null };
   commitDays: { date: Date }[];
   projects: {
     aiScore: number | null;
@@ -255,6 +257,7 @@ export async function listProgramCandidates(
       graduationYear: idn?.graduationYear ?? m.graduationYear,
       skills: idn?.skills.length ? idn.skills : m.skills,
       updatedAt: m.updatedAt,
+      startedAt: m.startedAt,
       cohort: { id: m.cohort.id, startsAt: m.cohort.startsAt },
       commitDays: commitsByPe.get(peId) ?? [],
       projects: (projectsByPe.get(peId) ?? []).map((p) => ({

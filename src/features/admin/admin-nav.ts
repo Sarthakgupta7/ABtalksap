@@ -63,6 +63,12 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         match: ["/admin/students"],
       },
       {
+        href: "/admin/cohorts",
+        label: "Cohorts",
+        icon: "cohort",
+        match: ["/admin/cohorts"],
+      },
+      {
         href: "/admin/recruiters",
         label: "Recruiters",
         icon: "recruiters",

@@ -59,16 +59,11 @@ const ROWS = {
 
 export function Library({ cohorts, challenges }: { cohorts: LibraryItem[]; challenges: LibraryItem[] }) {
   return (
-    <section
-      id="events"
-      className="scroll-mt-24 overflow-hidden rounded-[28px] bg-[radial-gradient(120%_80%_at_0%_0%,#123238_0%,#0A1215_55%,#070B0D_100%)] py-7 text-white sm:py-9"
-    >
-      <div className="px-5 sm:px-8">
-        <h3 className="font-heading text-2xl font-bold tracking-tight sm:text-[28px]">
-          Your next <span className="text-[#2BD4A0]">binge-worthy</span> skill
-        </h3>
-        <p className="mt-1 text-sm text-white/65">Pick up something new — every title here is built to get you hired.</p>
-      </div>
+    <section id="events" className="scroll-mt-24 pt-2">
+      <h3 className="font-heading text-2xl font-bold tracking-tight text-black sm:text-[28px]">
+        Your next <span className="text-[#03535F]">binge-worthy</span> skill
+      </h3>
+      <p className="mt-1 text-sm text-[#4B4B4B]">Pick up something new — every title here is built to get you hired.</p>
       <Row id="prep-kit" row={ROWS.job} items={cohorts} />
       <Row id="domains-library" row={ROWS.personal} items={challenges} />
     </section>
@@ -83,16 +78,17 @@ function Row({ id, row, items }: { id: string; row: (typeof ROWS)[keyof typeof R
   if (items.length === 0) return null;
   return (
     <div id={id} className="group/row mt-8 scroll-mt-24">
-      <div className="flex items-end justify-between gap-4 px-5 sm:px-8">
+      <div className="flex items-end justify-between gap-4">
         <div className="min-w-0">
-          <h4 className="font-heading text-xl font-bold sm:text-2xl">{row.title}</h4>
-          <p className="mt-0.5 text-sm text-white/60">{row.sub}</p>
+          <h4 className="font-heading text-xl font-bold text-black sm:text-2xl">{row.title}</h4>
+          <p className="mt-0.5 text-sm text-[#6B7280]">{row.sub}</p>
         </div>
       </div>
-      <div className="relative mt-4">
+      {/* Bleeds to the page edges so tiles scroll in from off-screen. */}
+      <div className="relative -mx-3 mt-4 sm:-mx-5 lg:-mx-8">
         <ul
           ref={strip}
-          className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-5 px-5 py-3 sm:scroll-px-8 sm:px-8"
+          className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-3 px-3 py-4 sm:scroll-px-5 sm:px-5 lg:scroll-px-8 lg:px-8"
         >
           {items.map((it) => (
             <Tile key={it.key} item={it} />
@@ -113,10 +109,10 @@ function EdgeButton({ side, onClick }: { side: "left" | "right"; onClick: () => 
       onClick={onClick}
       aria-label={side === "left" ? "Scroll left" : "Scroll right"}
       className={cn(
-        "absolute inset-y-3 z-10 hidden w-12 items-center justify-center text-white opacity-0 transition-opacity focus-visible:opacity-100 group-hover/row:opacity-100 md:flex",
+        "absolute inset-y-4 z-10 hidden w-14 items-center justify-center text-[#03535F] opacity-0 transition-opacity focus-visible:opacity-100 group-hover/row:opacity-100 md:flex",
         side === "left"
-          ? "left-0 bg-[linear-gradient(90deg,rgba(7,11,13,0.9),transparent)]"
-          : "right-0 bg-[linear-gradient(270deg,rgba(7,11,13,0.9),transparent)]",
+          ? "left-0 bg-[linear-gradient(90deg,#F4F4F4_30%,rgba(244,244,244,0))]"
+          : "right-0 bg-[linear-gradient(270deg,#F4F4F4_30%,rgba(244,244,244,0))]",
       )}
     >
       <Icon className="size-8" aria-hidden="true" />
@@ -136,7 +132,7 @@ function Tile({ item }: { item: LibraryItem }) {
     <li className="w-[260px] shrink-0 snap-start sm:w-[290px]">
       <Link
         href={item.href}
-        className="group/tile block overflow-hidden rounded-xl bg-[#141B1E] shadow-[0_12px_28px_-16px_rgba(0,0,0,0.8)] ring-1 ring-white/10 transition-[transform,box-shadow] duration-300 hover:z-10 hover:scale-[1.05] hover:shadow-[0_24px_48px_-20px_rgba(0,0,0,0.9)] hover:ring-white/25 focus-visible:scale-[1.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2BD4A0]"
+        className="group/tile block overflow-hidden rounded-xl bg-[#141B1E] text-white shadow-[0_12px_28px_-16px_rgba(0,0,0,0.6)] ring-1 ring-black/5 transition-[transform,box-shadow] duration-300 hover:z-10 hover:scale-[1.05] hover:shadow-[0_24px_48px_-20px_rgba(0,0,0,0.9)] hover:ring-white/25 focus-visible:scale-[1.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2BD4A0]"
       >
         <div className={cn("relative aspect-[16/9] overflow-hidden", art?.logo ? "bg-white" : "bg-[#0A0F12]")}>
           {art ? (

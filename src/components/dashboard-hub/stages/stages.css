@@ -50,8 +50,17 @@
 /* ─── Track cover cards: details drop down on hover / focus ────
    The details panel is absolutely positioned under the cover so it
    overlays what's below instead of pushing the grid around. */
-.track-card { outline: none; z-index: 1; }
-.track-card:hover, .track-card:focus-within { z-index: 20; }
+.track-card {
+  outline: none;
+  z-index: 1;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.3s ease;
+}
+/* Netflix-style lift: the whole card grows and casts a deeper shadow. */
+.track-card:hover, .track-card:focus-within {
+  z-index: 20;
+  transform: scale(1.05);
+  filter: drop-shadow(0 22px 30px rgba(0, 0, 0, 0.28));
+}
 .track-card__details {
   position: absolute;
   left: 0;
@@ -86,6 +95,10 @@
   }
   .track-card__cover { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 }
+@media (hover: none) {
+  .track-card:hover, .track-card:focus-within { transform: none; filter: none; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .track-card__details { transition: none; }
+  .track-card, .track-card__details { transition: none; }
+  .track-card:hover, .track-card:focus-within { transform: none; }
 }

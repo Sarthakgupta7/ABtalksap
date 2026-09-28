@@ -131,6 +131,52 @@ The codebase is shared by multiple developers using AI-assisted coding.
 
 Your first responsibility is to respect module ownership.
 
+## LOCKED MODULE — Notifications (owner: Manuvrtti ONLY)
+
+This is a HARD LOCK and overrides every other instruction in this file,
+including "My Ownership" below, whoever the current developer is (Sohail,
+Shivansh, Zainab, Shashank, Shallika or anyone else) and whatever tool
+(Claude, Cursor, Copilot, …) is doing the editing.
+
+Only **Manuvrtti** may create, edit, move, rename or delete notification code.
+Everyone else must get Manuvrtti's explicit approval FIRST, for that specific
+change. Approval does not carry over to later changes.
+
+Locked paths (the whole file or folder):
+- `src/features/notification/**` (feed, derived events, recruiter filter,
+  notify helper, delivery, email templates, tests)
+- `src/features/recruiter-notifications/**`
+- `src/features/profile-view-notification/**`
+- `src/app/actions/notification-actions.ts`
+- `src/app/actions/admin-notification-actions.ts`
+- `src/app/actions/admin-notify-actions.ts`
+- `src/app/admin/notifications/**`
+- `src/app/settings/notifications/**`
+- `src/app/api/notification-preferences/**`
+- `src/components/shared/notification-provider.tsx`
+- `src/components/shared/notification-bell-button.tsx`
+- `src/components/shared/notification-analytics-tracker.tsx`
+- `src/components/admin/notification-composer.tsx`
+- `src/components/admin/notifications-table.tsx`
+- `src/components/settings/notification-preferences-form.tsx`
+- `src/lib/observability/notification-*.ts`
+- Prisma models `Notification`, `NotificationRead`, `UserNotification`,
+  `NotificationDelivery`, `NotificationPreference` and enums
+  `NotificationAudience`, `NotificationCategory` (plus their migrations)
+
+Rules for AI agents working for anyone other than Manuvrtti:
+1. Do NOT edit any locked path, even for a "small", "obvious" or
+   "unrelated cleanup" change, a rename, a lint fix or a type fix.
+2. If a task needs a locked path to change, STOP before editing and output:
+   `NOTIFICATION MODULE LOCKED — approval required from Manuvrtti`, then the
+   files, why the change is needed and the exact proposed diff. Wait.
+3. Calling the public API is fine and needs no approval: `notifyUser` /
+   `notify.ts`, the `notification-service` dispatch functions, and rendering
+   `<NotificationBellButton />` in a header. Changing how they work is not.
+4. Do not copy, fork or re-implement notification logic elsewhere to get
+   around this lock.
+5. If you are unsure whether a file is covered, treat it as locked and ask.
+
 ## My Ownership
 
 I am Sohail.
@@ -194,8 +240,8 @@ Manuvrtti:
 - Jobs
 - Applications
 - Job alerts
-- Notifications
-- Notification delivery
+- Notifications — LOCKED, see "LOCKED MODULE — Notifications" above
+- Notification delivery — LOCKED, see above
 - Analytics events
 - UTM tracking
 

@@ -175,7 +175,7 @@ export function VideoRegistrationForm({
                     type="tel"
                     inputMode="tel"
                     autoComplete="tel-national"
-                    placeholder="98765 43210"
+                    placeholder="Enter your phone number"
                     {...field}
                   />
                 </FormControl>
@@ -194,7 +194,7 @@ export function VideoRegistrationForm({
               <FormControl>
                 <Input
                   autoComplete="address-level2"
-                  placeholder="Mumbai"
+                  placeholder="Enter your city"
                   {...field}
                 />
               </FormControl>
@@ -290,7 +290,7 @@ export function VideoRegistrationForm({
                   type="url"
                   inputMode="url"
                   spellCheck={false}
-                  placeholder="https://behance.net/... or drive.google.com/... or your reel"
+                  placeholder="Enter your portfolio link"
                   {...field}
                 />
               </FormControl>

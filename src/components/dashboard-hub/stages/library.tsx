@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, BarChart3, Blocks, Bot, ChevronLeft, ChevronRight, Code2, Network, Sparkles, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -60,42 +60,46 @@ const ROWS = {
 export function Library({ cohorts, challenges }: { cohorts: LibraryItem[]; challenges: LibraryItem[] }) {
   return (
     <section id="events" className="scroll-mt-24 pt-2">
-      <h3 className="font-heading text-2xl font-bold tracking-tight text-black sm:text-[28px]">
-        Your next <span className="text-[#03535F]">binge-worthy</span> skill
-      </h3>
-      <p className="mt-1 text-sm text-[#4B4B4B]">Pick up something new — every title here is built to get you hired.</p>
       <Row id="prep-kit" row={ROWS.job} items={cohorts} />
       <Row id="domains-library" row={ROWS.personal} items={challenges} />
     </section>
   );
 }
 
+/* A Netflix-style row. The strip is clipped horizontally but not
+   vertically (overflow-x: clip), so a hovered tile can grow past the row
+   and drop its details over whatever is below. Paging moves the strip
+   with a transform; on touch screens it falls back to native scrolling. */
 function Row({ id, row, items }: { id: string; row: (typeof ROWS)[keyof typeof ROWS]; items: LibraryItem[] }) {
+  const frame = useRef<HTMLDivElement>(null);
   const strip = useRef<HTMLUListElement>(null);
-  const scroll = (dir: 1 | -1) =>
-    strip.current?.scrollBy({ left: dir * strip.current.clientWidth * 0.85, behavior: "smooth" });
+  const [offset, setOffset] = useState(0);
+
+  const page = (dir: 1 | -1) => {
+    const f = frame.current;
+    const st = strip.current;
+    if (!f || !st) return;
+    const max = Math.max(0, st.scrollWidth - f.clientWidth);
+    setOffset((o) => Math.min(max, Math.max(0, o + dir * f.clientWidth * 0.85)));
+  };
 
   if (items.length === 0) return null;
   return (
-    <div id={id} className="group/row mt-8 scroll-mt-24">
-      <div className="flex items-end justify-between gap-4">
-        <div className="min-w-0">
-          <h4 className="font-heading text-xl font-bold text-black sm:text-2xl">{row.title}</h4>
-          <p className="mt-0.5 text-sm text-[#6B7280]">{row.sub}</p>
-        </div>
-      </div>
-      {/* Bleeds to the page edges so tiles scroll in from off-screen. */}
-      <div className="relative -mx-3 mt-4 sm:-mx-5 lg:-mx-8">
+    <div id={id} className="lib-row group/row mt-8 scroll-mt-24 first:mt-0">
+      <h4 className="font-heading text-xl font-bold text-black sm:text-2xl">{row.title}</h4>
+      <p className="mt-0.5 text-sm text-[#6B7280]">{row.sub}</p>
+      <div ref={frame} className="lib-frame relative -mx-3 mt-4 sm:-mx-5 lg:-mx-8">
         <ul
           ref={strip}
-          className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-3 px-3 py-4 sm:scroll-px-5 sm:px-5 lg:scroll-px-8 lg:px-8"
+          className="lib-strip flex gap-4 px-3 py-3 transition-transform duration-500 ease-out sm:px-5 lg:px-8"
+          style={{ ["--lib-offset" as string]: `-${offset}px` }}
         >
           {items.map((it) => (
             <Tile key={it.key} item={it} />
           ))}
         </ul>
-        <EdgeButton side="left" onClick={() => scroll(-1)} />
-        <EdgeButton side="right" onClick={() => scroll(1)} />
+        {offset > 0 ? <EdgeButton side="left" onClick={() => page(-1)} /> : null}
+        <EdgeButton side="right" onClick={() => page(1)} />
       </div>
     </div>
   );
@@ -107,12 +111,12 @@ function EdgeButton({ side, onClick }: { side: "left" | "right"; onClick: () => 
     <button
       type="button"
       onClick={onClick}
-      aria-label={side === "left" ? "Scroll left" : "Scroll right"}
+      aria-label={side === "left" ? "Previous" : "Next"}
       className={cn(
-        "absolute inset-y-4 z-10 hidden w-14 items-center justify-center text-[#03535F] opacity-0 transition-opacity focus-visible:opacity-100 group-hover/row:opacity-100 md:flex",
+        "lib-edge absolute inset-y-3 z-40 hidden w-12 items-center justify-center text-[#03535F] opacity-0 transition-opacity focus-visible:opacity-100 group-hover/row:opacity-100",
         side === "left"
-          ? "left-0 bg-[linear-gradient(90deg,#F4F4F4_30%,rgba(244,244,244,0))]"
-          : "right-0 bg-[linear-gradient(270deg,#F4F4F4_30%,rgba(244,244,244,0))]",
+          ? "left-0 bg-[linear-gradient(90deg,#F4F4F4_35%,rgba(244,244,244,0))]"
+          : "right-0 bg-[linear-gradient(270deg,#F4F4F4_35%,rgba(244,244,244,0))]",
       )}
     >
       <Icon className="size-8" aria-hidden="true" />
@@ -120,6 +124,8 @@ function EdgeButton({ side, onClick }: { side: "left" | "right"; onClick: () => 
   );
 }
 
+/* At rest: artwork only. On hover/focus the tile grows (1.3x) and its
+   details drop in beneath the image. */
 function Tile({ item }: { item: LibraryItem }) {
   const art = ART[item.art];
   const Icon = ICON[item.art];
@@ -129,12 +135,13 @@ function Tile({ item }: { item: LibraryItem }) {
     item.kicker,
   ].filter(Boolean);
   return (
-    <li className="w-[260px] shrink-0 snap-start sm:w-[290px]">
+    <li className="lib-tile relative w-[240px] shrink-0 sm:w-[270px]">
       <Link
         href={item.href}
-        className="group/tile block overflow-hidden rounded-xl bg-white text-black shadow-[0_12px_28px_-18px_rgba(0,0,0,0.35)] ring-1 ring-black/[0.06] transition-[transform,box-shadow] duration-300 hover:z-10 hover:scale-[1.05] hover:shadow-[0_24px_44px_-22px_rgba(3,83,95,0.45)] hover:ring-[#03535F]/20 focus-visible:scale-[1.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2BD4A0]"
+        aria-label={item.title}
+        className="lib-tile__card block rounded-xl bg-white shadow-[0_10px_24px_-16px_rgba(0,0,0,0.35)] ring-1 ring-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#03535F]"
       >
-        <div className={cn("relative aspect-[16/9] overflow-hidden", art?.logo ? "bg-white" : "bg-[#0A0F12]")}>
+        <div className={cn("lib-tile__img relative aspect-[16/9] overflow-hidden rounded-xl", art?.logo ? "bg-white" : "bg-[#0A0F12]")}>
           {art ? (
             // eslint-disable-next-line @next/next/no-img-element -- static tile art
             <img
@@ -145,13 +152,11 @@ function Tile({ item }: { item: LibraryItem }) {
           ) : (
             <GlossyArt Icon={Icon} tint={TINT[item.art]} />
           )}
-          <span className="absolute left-2.5 top-2.5 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white">
-            {item.kicker}
-          </span>
         </div>
-        <div className="p-3.5">
-          <p className="truncate font-heading text-base font-bold">{item.title}</p>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-[#6B7280]">
+        <div className="lib-tile__details rounded-b-xl bg-white px-3.5 pb-3.5 pt-3 text-black">
+          <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#03535F]">{item.kicker}</p>
+          <p className="mt-0.5 truncate font-heading text-[15px] font-bold leading-tight">{item.title}</p>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10px] text-[#6B7280]">
             {meta.map((m, i) => (
               <span key={m} className="flex items-center gap-1.5">
                 {i > 0 ? <span className="size-1 rounded-full bg-[#C4CACA]" aria-hidden="true" /> : null}
@@ -159,15 +164,10 @@ function Tile({ item }: { item: LibraryItem }) {
               </span>
             ))}
           </p>
-          {/* Revealed on hover, Netflix-style */}
-          <div className="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 group-hover/tile:grid-rows-[1fr] group-focus-visible/tile:grid-rows-[1fr]">
-            <div className="overflow-hidden">
-              <p className="mt-2 line-clamp-2 text-xs text-[#4B4B4B]">{item.blurb}</p>
-              <span className="mt-3 inline-flex h-8 items-center gap-1 rounded-full bg-[#03535F] px-3.5 text-xs font-bold text-white shadow-[inset_0_-3px_8px_rgba(0,0,0,0.22)]">
-                {item.cta} <ArrowRight className="size-3.5" aria-hidden="true" />
-              </span>
-            </div>
-          </div>
+          <p className="mt-1.5 line-clamp-2 text-[11px] leading-snug text-[#4B4B4B]">{item.blurb}</p>
+          <span className="mt-2.5 inline-flex h-7 items-center gap-1 rounded-full bg-[#03535F] px-3 text-[11px] font-bold text-white shadow-[inset_0_-3px_8px_rgba(0,0,0,0.22)]">
+            {item.cta} <ArrowRight className="size-3" aria-hidden="true" />
+          </span>
         </div>
       </Link>
     </li>

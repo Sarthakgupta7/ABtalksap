@@ -433,7 +433,9 @@ suite("the logo blob path is built only from server-resolved values", () => {
 });
 
 suite("the upload sniffs magic bytes and requires them to match the declared type", () => {
-  const src = source("src/app/actions/recruiter-profile-actions.ts");
+  // Plan 159 moved these checks into org-logo-storage.readLogoUpload so the
+  // recruiter's own control and the admin create form share ONE copy of them.
+  const src = source("src/features/hire/org-logo-storage.ts");
   assert(src.includes("function sniffImageType"), "a byte sniff must exist");
   assert(
     src.includes("sniffed.mime !== file.type"),
@@ -447,6 +449,21 @@ suite("the upload sniffs magic bytes and requires them to match the declared typ
     src.includes("file.size > LOGO_MAX_BYTES"),
     "the size cap must be enforced on the server, not just in the browser",
   );
+});
+
+suite("both logo upload paths go through the one shared validation", () => {
+  const recruiter = source("src/app/actions/recruiter-profile-actions.ts");
+  const admin = source("src/app/actions/admin-recruiter-actions.ts");
+  for (const [label, src] of [
+    ["the recruiter's own control", recruiter],
+    ["the admin create form", admin],
+  ] as const) {
+    assert(src.includes("readLogoUpload("), `${label} must call readLogoUpload`);
+    assert(
+      !src.includes("function sniffImageType"),
+      `${label} must not carry its own copy of the byte sniff`,
+    );
+  }
 });
 
 suite("the logo store is public and is never the private résumé store", () => {

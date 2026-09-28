@@ -65,6 +65,8 @@
     "test:observability:contract": "tsx src/lib/observability/domain-log.test.ts",
     "test:observability:scan": "tsx scripts/scan-log-leaks.ts",
     "sentry:smoke": "tsx scripts/sentry-smoke.ts",
+    "test:recruiter-delete": "cross-env NODE_OPTIONS=--conditions=react-server tsx src/features/hire/delete-recruiter-account.test.ts",
+    "test:admin-create-recruiter": "cross-env NODE_OPTIONS=--conditions=react-server tsx src/features/admin/create-recruiter.test.ts",
     "test:hire-pagination": "tsx src/features/hire/match-pagination.test.ts",
     "test:hire-score": "tsx src/features/hire/score-candidate.test.ts",
     "test:spoken-brief": "tsx src/features/hire/spoken-brief.test.ts",

@@ -1,13 +1,10 @@
 "use server";
 
-import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { logger, safeErrorMessage } from "@/lib/logger";
 import { requireRecruiterWorkspace } from "@/features/recruiter-workspace/workspace";
 import {
-  LOGO_MAX_BYTES,
-  isAllowedLogoMimeType,
   updateRecruiterProfileSchema,
   type RecruiterProfileDetails,
 } from "@/lib/validations/recruiter-profile";
@@ -15,6 +12,7 @@ import {
   deleteCompanyLogoBlob,
   isCompanyLogoStorageConfigured,
   isOurCompanyLogoUrl,
+  readLogoUpload,
   storeCompanyLogoFile,
 } from "@/features/hire/org-logo-storage";
 
@@ -156,45 +154,6 @@ export async function updateRecruiterProfileAction(
   }
 }
 
-/**
- * Declared content type is attacker input. This reads the actual leading bytes
- * and the caller then requires the two to agree, so a `.svg` renamed to `.png`
- * is refused before it ever reaches a public store.
- *
- * Deliberately duplicated from `candidate-profile-actions.ts` rather than
- * extracted: that file belongs to the candidate-profile module, and a shared
- * util would couple two owners' upload paths for twenty lines of constants.
- */
-function sniffImageType(
-  bytes: Uint8Array,
-): { mime: string; ext: string } | null {
-  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-    return { mime: "image/jpeg", ext: "jpg" };
-  }
-  if (
-    bytes[0] === 0x89 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x4e &&
-    bytes[3] === 0x47
-  ) {
-    return { mime: "image/png", ext: "png" };
-  }
-  if (
-    bytes[0] === 0x52 &&
-    bytes[1] === 0x49 &&
-    bytes[2] === 0x46 &&
-    bytes[3] === 0x46 &&
-    bytes[8] === 0x57 &&
-    bytes[9] === 0x45 &&
-    bytes[10] === 0x42 &&
-    bytes[11] === 0x50
-  ) {
-    return { mime: "image/webp", ext: "webp" };
-  }
-  return null;
-}
-
-const LOGO_TYPE_MESSAGE = "Please choose a PNG, JPEG, or WebP image.";
 
 /**
  * Stores a company logo and points `Organization.logoUrl` at it (plan 158).
@@ -219,40 +178,11 @@ export async function uploadCompanyLogoAction(
     return { ok: false, message: "Logo upload is not available right now." };
   }
 
-  const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) {
-    return { ok: false, message: "Choose an image to upload." };
-  }
-  if (file.size > LOGO_MAX_BYTES) {
-    return {
-      ok: false,
-      message: "That file is too large. Please choose an image under 2 MB.",
-    };
-  }
-  if (file.type === "image/svg+xml" || !isAllowedLogoMimeType(file.type)) {
-    return { ok: false, message: LOGO_TYPE_MESSAGE };
-  }
-
-  let bytes: Uint8Array;
-  try {
-    bytes = new Uint8Array(await file.arrayBuffer());
-  } catch (error) {
-    logger.error("[org-logo] failed to read upload", {
-      userId,
-      organizationId,
-      error: safeErrorMessage(error),
-    });
-    return { ok: false, message: "Could not read that file. Please try again." };
-  }
-
-  const sniffed = sniffImageType(bytes);
-  if (!sniffed || sniffed.mime !== file.type) {
-    return { ok: false, message: LOGO_TYPE_MESSAGE };
-  }
-
-  const contentHash = createHash("sha256")
-    .update(Buffer.from(bytes))
-    .digest("hex");
+  // Size, MIME, magic bytes and the declared-type equality check all live in
+  // readLogoUpload, which the admin create form (plan 159) shares. One copy.
+  const upload = await readLogoUpload(formData.get("file"));
+  if (!upload.ok) return upload;
+  const { bytes, contentHash } = upload;
 
   let url: string;
   try {
@@ -264,9 +194,9 @@ export async function uploadCompanyLogoAction(
     const stored = await storeCompanyLogoFile({
       organizationId,
       contentHash,
-      ext: sniffed.ext,
+      ext: upload.ext,
       bytes,
-      mimeType: sniffed.mime,
+      mimeType: upload.mime,
     });
     if (!stored) {
       return { ok: false, message: "Logo upload is not available right now." };

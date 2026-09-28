@@ -1,6 +1,11 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { del, put } from "@vercel/blob";
 import { logger } from "@/lib/logger";
+import {
+  LOGO_MAX_BYTES,
+  isAllowedLogoMimeType,
+} from "@/lib/validations/recruiter-profile";
 
 /**
  * Company logo storage on Vercel Blob (plan 158).
@@ -26,6 +31,108 @@ import { logger } from "@/lib/logger";
  * and built only from server-resolved values, so no caller can steer it at
  * another organization's prefix.
  */
+
+// ---------------------------------------------------------------------------
+// Accepting an uploaded file
+// ---------------------------------------------------------------------------
+
+/**
+ * Declared content type is attacker input. This reads the actual leading bytes,
+ * and `readLogoUpload` below requires the two to agree, so a `.svg` renamed to
+ * `.png` is refused before it can reach a public store.
+ */
+function sniffImageType(
+  bytes: Uint8Array,
+): { mime: string; ext: string } | null {
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return { mime: "image/jpeg", ext: "jpg" };
+  }
+  if (
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47
+  ) {
+    return { mime: "image/png", ext: "png" };
+  }
+  if (
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return { mime: "image/webp", ext: "webp" };
+  }
+  return null;
+}
+
+const LOGO_TYPE_MESSAGE = "Please choose a PNG, JPEG, or WebP image.";
+
+export type LogoUploadResult =
+  | {
+      ok: true;
+      bytes: Uint8Array;
+      ext: string;
+      mime: string;
+      /** sha256, which is what makes the stored path content-addressed. */
+      contentHash: string;
+    }
+  | { ok: false; message: string };
+
+/**
+ * Validate one uploaded logo file (plan 159).
+ *
+ * This is the single copy of the check. It lived inline in
+ * `uploadCompanyLogoAction` when plan 158 added the recruiter's own control;
+ * the admin create form (plan 159) needs exactly the same rules, and a security
+ * control duplicated across two call sites is a control that drifts.
+ *
+ * Order matters and is deliberate: refuse SVG by name before consulting the
+ * allow-list, and require the sniffed type to equal the declared one.
+ */
+export async function readLogoUpload(file: unknown): Promise<LogoUploadResult> {
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, message: "Choose an image to upload." };
+  }
+  if (file.size > LOGO_MAX_BYTES) {
+    return {
+      ok: false,
+      message: "That file is too large. Please choose an image under 2 MB.",
+    };
+  }
+  if (file.type === "image/svg+xml" || !isAllowedLogoMimeType(file.type)) {
+    return { ok: false, message: LOGO_TYPE_MESSAGE };
+  }
+
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(await file.arrayBuffer());
+  } catch (error) {
+    logger.error("[org-logo] failed to read upload", { error: String(error) });
+    return { ok: false, message: "Could not read that file. Please try again." };
+  }
+
+  const sniffed = sniffImageType(bytes);
+  if (!sniffed || sniffed.mime !== file.type) {
+    return { ok: false, message: LOGO_TYPE_MESSAGE };
+  }
+
+  return {
+    ok: true,
+    bytes,
+    ext: sniffed.ext,
+    mime: sniffed.mime,
+    contentHash: createHash("sha256").update(Buffer.from(bytes)).digest("hex"),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Storage
+// ---------------------------------------------------------------------------
 
 /** Preferred first, then the existing public avatar store. Do not rename. */
 const TOKEN_ENVS = ["logo_READ_WRITE_TOKEN", "avatar_READ_WRITE_TOKEN"] as const;

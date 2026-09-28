@@ -78,7 +78,7 @@ export function VideoSubmissionForm({ initial, editable, closed }: Props) {
       <section className="vt-card vt-card--dark is-locked">
         <header className="vt-card__head">
           <p className="vt-card__eyebrow">Scene 02 · Your cut</p>
-          <span className="vt-card__tag" data-tone="locked">Locked</span>
+         
         </header>
         <div className="vt-brief__lock">
           <span className="vt-brief__lock-icon" aria-hidden>
@@ -90,8 +90,8 @@ export function VideoSubmissionForm({ initial, editable, closed }: Props) {
           <div>
             <h2 className="vt-card__title">Submissions open at kickoff</h2>
             <p className="vt-card__body">
-              Once the clock starts you can paste one public link here and
-              re-save it as often as you like until the deadline.
+              Once the clock starts you can paste one public link here 
+              
             </p>
           </div>
         </div>
@@ -136,8 +136,7 @@ export function VideoSubmissionForm({ initial, editable, closed }: Props) {
       <h2 className="vt-card__title">Submit your cut</h2>
       <p className="vt-card__body">
         Paste one public link. Drive, Behance, YouTube, Vimeo. Set it to
-        &quot;anyone with the link can view&quot;. You can re-save any time
-        until the deadline; the last save is what the judges see.
+        &quot;anyone with the link can view&quot;. 
       </p>
 
       <div className="vt-panel__stack">
@@ -150,7 +149,7 @@ export function VideoSubmissionForm({ initial, editable, closed }: Props) {
             className="vt-field__input"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://drive.google.com/... or https://www.youtube.com/watch?v=..."
+            placeholder="Paste your PUBLIC submission link "
             aria-invalid={errors.submissionUrl ? true : undefined}
           />
           {errors.submissionUrl ? (
@@ -160,7 +159,7 @@ export function VideoSubmissionForm({ initial, editable, closed }: Props) {
 
         <label className="vt-field">
           <span className="vt-field__label">
-            Notes for the judges{" "}
+            Additional Notes {" "}
             <span className="vt-field__hint">(optional, 1000 chars max)</span>
           </span>
           <textarea
@@ -168,7 +167,7 @@ export function VideoSubmissionForm({ initial, editable, closed }: Props) {
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={4}
-            placeholder="Software used, sources credited, anything a judge should know before pressing play."
+            placeholder="How you used your creativity and skills to create this video"
             aria-invalid={errors.notes ? true : undefined}
           />
           {errors.notes ? (

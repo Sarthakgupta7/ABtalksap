@@ -18,7 +18,7 @@ import "@/components/hackathon-video/landing.css";
 export const metadata: Metadata = {
   title: `${VIDEOTHON.name} · ABTalks`,
   description:
-    "A 48-hour hackathon for video editors. Solo. One brief. Ship one cut.",
+    "A 24-hour hackathon for video editors. Solo. One brief. Ship one cut.",
 };
 
 const HIW_STEPS = [
@@ -31,8 +31,8 @@ const HIW_STEPS = [
     body: "Every participant joins the group. Kickoff, the brief, judge Q&A and last-minute updates land there first.",
   },
   {
-    title: "Cut for 48 hours",
-    body: "From Friday kickoff to Sunday deadline. Any software, any sources you have rights to. Ship one cut.",
+    title: "Cut for 24 hours",
+    body: "From Friday 8 PM kickoff to Saturday 8 PM deadline. Any software, any sources you have rights to. Ship one cut.",
   },
   {
     title: "Submit before the deadline",
@@ -66,7 +66,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Do I need to be in India?",
-    a: "No. It's a 48-hour online hackathon. Register with any phone number from the country-code list; submit from anywhere.",
+    a: "No. It's a 24-hour online hackathon. Register with any phone number from the country-code list; submit from anywhere.",
   },
   {
     q: "What software can I use?",
@@ -101,7 +101,7 @@ const RULES = [
   },
   {
     n: "03.",
-    title: "Everything inside 48 hours",
+    title: "Everything inside 24 hours",
     body: "The cut, the grade, the sound, the export. All after kickoff. Pre-built templates disclosed in submission notes.",
     variant: "rule--3",
   },
@@ -176,7 +176,7 @@ export default async function HackathonPage() {
         <div className="vt-hero__inner">
           <p className="vt-hero__eyebrow" aria-hidden>
             <span className="vt-hero__dot" />
-            REC · 48 HOURS · ONE BRIEF
+            REC · 24 HOURS · ONE BRIEF
           </p>
 
           <h1

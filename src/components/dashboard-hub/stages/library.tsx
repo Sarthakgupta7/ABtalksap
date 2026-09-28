@@ -152,6 +152,24 @@ function Tile({ item }: { item: LibraryItem }) {
           ) : (
             <GlossyArt Icon={Icon} tint={TINT[item.art]} />
           )}
+          {/* Title on the art, bottom-left, over a soft dark fade. */}
+          <div
+            className={cn(
+              "pointer-events-none absolute inset-x-0 bottom-0 px-3 pb-2.5 pt-8",
+              art?.logo
+                ? "bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.95)_75%)]"
+                : "bg-[linear-gradient(180deg,rgba(0,0,0,0)_0%,rgba(0,0,0,0.72)_100%)]",
+            )}
+          >
+            <p
+              className={cn(
+                "truncate font-heading text-[15px] font-bold leading-tight",
+                art?.logo ? "text-[#1F1F1F]" : "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]",
+              )}
+            >
+              {item.title}
+            </p>
+          </div>
         </div>
         <div className="lib-tile__details rounded-b-xl bg-white px-3.5 pb-3.5 pt-3 text-black">
           <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#03535F]">{item.kicker}</p>

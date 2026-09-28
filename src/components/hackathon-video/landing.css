@@ -1819,31 +1819,6 @@ body:has(.vt-dialog) [role="presentation"]:has([role="listbox"]) {
 /* ============================================================
  * PROBLEM STATEMENT  (locked / unlocked)
  * ============================================================ */
-.vt-brief__redacted {
-  display: grid;
-  gap: 10px;
-  margin: 0 0 24px;
-}
-.vt-brief__redacted span {
-  display: block;
-  height: 14px;
-  border-radius: 3px;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.06) 0%,
-    rgba(255, 255, 255, 0.14) 50%,
-    rgba(255, 255, 255, 0.06) 100%
-  );
-  background-size: 200% 100%;
-  animation: vt-redact 2.8s ease-in-out infinite;
-}
-@keyframes vt-redact {
-  0%   { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .vt-brief__redacted span { animation: none; }
-}
 .vt-brief__lock {
   display: flex;
   align-items: flex-start;

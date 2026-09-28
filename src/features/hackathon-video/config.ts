@@ -11,6 +11,8 @@
  * feature (`features/hackathon-video/*`).
  */
 
+import { isHackathonPreviewEnabled } from "@/lib/feature-flags";
+
 export const VIDEOTHON = {
   // TODO(organizer): finalize this slug before shipping the first row. It is
   // written to every HackathonVideoRegistration.eventId and cannot easily be
@@ -74,13 +76,22 @@ export type VideothonSubmissionWindow = {
   editable: boolean;
 };
 
-/** Window for the submission surface. Distinct from the registration gate. */
+/**
+ * Window for the submission surface. Distinct from the registration gate.
+ *
+ * Local preview: `HACKATHON_PREVIEW=true` in `.env.local` unlocks the brief and
+ * the submission form before kickoff — under `next dev` only, so the flag can
+ * never open the window in production. It lifts the kickoff lock only; the
+ * deadline still closes submissions.
+ */
 export function getVideothonSubmissionWindow(
   now: number = Date.now(),
 ): VideothonSubmissionWindow {
   const kickoff = new Date(VIDEOTHON.kickoffUtc).getTime();
   const deadline = new Date(VIDEOTHON.deadlineUtc).getTime();
-  const unlocked = now >= kickoff;
+  const preview =
+    process.env.NODE_ENV === "development" && isHackathonPreviewEnabled();
+  const unlocked = now >= kickoff || preview;
   const closed = now >= deadline;
   return { unlocked, closed, editable: unlocked && !closed };
 }

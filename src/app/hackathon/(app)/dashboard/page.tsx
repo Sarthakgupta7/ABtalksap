@@ -139,12 +139,6 @@ export default async function VideothonDashboardPage() {
           </>
         ) : (
           <>
-            <div className="vt-brief__redacted" aria-hidden>
-              <span style={{ width: "94%" }} />
-              <span style={{ width: "78%" }} />
-              <span style={{ width: "88%" }} />
-              <span style={{ width: "62%" }} />
-            </div>
             <div className="vt-brief__lock">
               <span className="vt-brief__lock-icon" aria-hidden>
                 <svg viewBox="0 0 24 24" focusable="false">
@@ -157,8 +151,7 @@ export default async function VideothonDashboardPage() {
                   The problem statement is locked
                 </h2>
                 <p className="vt-card__body">
-                  It unlocks at kickoff, {VIDEOTHON.kickoffLabel}. Everyone
-                  gets it at the same second, here and in the WhatsApp group.
+                  It unlocks at kickoff, {VIDEOTHON.kickoffLabel}. 
                 </p>
               </div>
             </div>

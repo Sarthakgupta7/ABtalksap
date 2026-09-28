@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { safeErrorMessage } from "@/lib/observability/redact";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { verifyOtpAction } from "@/app/actions/otp-actions";
+import { checkPhoneAvailableAction, verifyOtpAction } from "@/app/actions/otp-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -204,6 +204,7 @@ export function PhoneVerifyField({
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
 
   const isIndia = countryCode === INDIA_DIALING_CODE;
 
@@ -236,6 +237,7 @@ export function PhoneVerifyField({
   const resetVerification = useCallback(() => {
     setStep("idle");
     setOtp("");
+    setPhoneError(null);
   }, []);
 
   function handleCountryChange(next: string | null) {
@@ -247,7 +249,7 @@ export function PhoneVerifyField({
   function handleNumberChange(raw: string) {
     const cleaned = raw.replace(/[^\d]/g, "").slice(0, 15);
     setPhoneNumber(cleaned);
-    if (step !== "idle") resetVerification();
+    if (step !== "idle" || phoneError) resetVerification();
   }
 
   const validMobile = indianMobileNumberSchema.safeParse(phoneNumber).success;
@@ -258,7 +260,14 @@ export function PhoneVerifyField({
       return;
     }
     setSending(true);
+    setPhoneError(null);
     try {
+      const available = await checkPhoneAvailableAction({ countryCode, phoneNumber });
+      if (!available.ok) {
+        setPhoneError(available.message);
+        toast.error(available.message);
+        return;
+      }
       if (IS_BYPASS) {
         setStep("sent");
         setCooldown(RESEND_COOLDOWN_SECONDS);
@@ -415,6 +424,12 @@ export function PhoneVerifyField({
           </Button>
         ) : null}
       </div>
+
+      {phoneError ? (
+        <p role="alert" className="text-sm text-destructive">
+          {phoneError}
+        </p>
+      ) : null}
 
       {verificationRequired && isIndia && step === "verified" ? (
         <p className="flex items-center gap-1.5 text-sm text-[#197E23] dark:text-[#197E23]">

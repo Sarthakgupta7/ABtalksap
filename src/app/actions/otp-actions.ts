@@ -1,21 +1,87 @@
 "use server";
 
+import type { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { auth } from "@/auth";
 import { writeClient } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { verifyAccessToken } from "@/lib/msg91";
 import { isOtpDevBypassEnabled, otpDevCode } from "@/lib/feature-flags";
 import { otpVerifySchema } from "@/lib/validations/otp";
-import { toE164, toWidgetMobile } from "@/lib/validations/phone";
+import {
+  INDIA_DIALING_CODE,
+  indianMobileNumberSchema,
+  toE164,
+  toWidgetMobile,
+} from "@/lib/validations/phone";
 import { applyCandidateIdentityChange } from "@/repositories/candidate-identity";
 
 type ActionResult = { ok: true } | { ok: false; message: string };
+
+const PHONE_TAKEN_MESSAGE = "This number is already linked to another account.";
+
+const phoneCheckSchema = z.object({
+  countryCode: z.literal(INDIA_DIALING_CODE),
+  phoneNumber: indianMobileNumberSchema,
+});
+
+/** One verified number per account: true if a different user already holds it verified. */
+async function isPhoneTakenByOther(
+  db: Prisma.TransactionClient,
+  e164: string,
+  userId: string,
+): Promise<boolean> {
+  const [otherVerification, otherProfile] = await Promise.all([
+    db.phoneVerification.findFirst({
+      where: { phone: e164, verified: true, userId: { not: userId } },
+      select: { id: true },
+    }),
+    db.candidateProfile.findFirst({
+      where: { phone: e164, phoneVerified: true, userId: { not: userId } },
+      select: { id: true },
+    }),
+  ]);
+  return Boolean(otherVerification || otherProfile);
+}
+
+/**
+ * Called before Send OTP so no code is sent (and no OTP box shown) for a
+ * number another account already holds as verified.
+ */
+export async function checkPhoneAvailableAction(input: {
+  countryCode: string;
+  phoneNumber: string;
+}): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { ok: false, message: "Not authenticated" };
+  }
+  const userId = session.user.id;
+
+  const parsed = phoneCheckSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Enter a valid 10-digit Indian mobile number" };
+  }
+
+  const e164 = toE164(parsed.data.countryCode, parsed.data.phoneNumber);
+  try {
+    if (await isPhoneTakenByOther(writeClient(), e164, userId)) {
+      logger.warn("[otp] send blocked: number verified on another account", { userId });
+      return { ok: false, message: PHONE_TAKEN_MESSAGE };
+    }
+  } catch (e) {
+    logger.error("[otp] phone availability check failed", { error: String(e) });
+    return { ok: false, message: "Could not send OTP. Please try again." };
+  }
+  return { ok: true };
+}
 
 /**
  * Verify a phone OTP and record the verification.
  *
  * Live: validates the MSG91 widget access token server-side.
  * Dev-bypass: accepts the fixed dev code.
+ * Rejects a number that another account already holds as verified.
  * On success, upserts the `PhoneVerification` bridge row (used by registration
  * before a StudentProfile exists) and, if a profile already exists, marks it
  * verified in place.
@@ -66,7 +132,11 @@ export async function verifyOtpAction(input: {
   }
 
   try {
-    await writeClient().$transaction(async (tx) => {
+    const claimed = await writeClient().$transaction(async (tx) => {
+      // Re-checked here (not just at send time) so a claim that lands between
+      // Send OTP and Verify still loses.
+      if (await isPhoneTakenByOther(tx, e164, userId)) return false;
+
       await tx.phoneVerification.upsert({
         where: { userId },
         create: {
@@ -92,8 +162,22 @@ export async function verifyOtpAction(input: {
           phoneVerified: true,
           phoneVerifiedAt: new Date(),
         });
+        // Plan 154: a verified phone completes the review of a profile that
+        // was filled in from a résumé — the dashboard banner goes away.
+        await tx.candidateProfile.updateMany({
+          where: { userId, reviewPendingSince: { not: null } },
+          data: { reviewPendingSince: null },
+        });
       }
+      return true;
     });
+    if (!claimed) {
+      logger.warn("[otp] number already verified on another account", { userId });
+      return {
+        ok: false,
+        message: PHONE_TAKEN_MESSAGE,
+      };
+    }
   } catch (e) {
     logger.error("[otp] failed to persist verification", { error: String(e) });
     return { ok: false, message: "Could not save verification. Try again." };

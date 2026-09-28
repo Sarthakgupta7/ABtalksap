@@ -56,7 +56,7 @@ export default async function VideothonDashboardPage() {
       ? `Submissions are closed. ${VIDEOTHON.resultsLabel}.`
       : phase === "live"
         ? "The clock is running. Cut, export, and save your link before the deadline."
-        : "You're in. The problem statement unlocks here and in the WhatsApp group at kickoff.";
+        : "You're in. The problem statement unlocks here.";
   const resultsDate = VIDEOTHON.resultsLabel.replace(/^Winners announced: /, "");
 
   return (
@@ -76,7 +76,7 @@ export default async function VideothonDashboardPage() {
 
           <h1 className="vt-hero__title" id="vt-desk-title">
             <em data-glitch={VIDEOTHON.name}>{VIDEOTHON.name}</em>
-            <span className="vt-hero__title-sub">Welcome, {firstName}</span>
+            <span className="vt-hero__title-sub">Welcome to the Dashboard, {firstName}</span>
           </h1>
 
           <p className="vt-hero__lede">{lede}</p>
@@ -131,7 +131,7 @@ export default async function VideothonDashboardPage() {
                   The problem statement is unlocked
                 </h2>
                 <p className="vt-card__body">
-                  It dropped at kickoff, {VIDEOTHON.kickoffLabel}.
+                  Dropped at {VIDEOTHON.kickoffLabel}.
                 </p>
               </div>
             </div>
@@ -151,14 +151,14 @@ export default async function VideothonDashboardPage() {
                   The problem statement is locked
                 </h2>
                 <p className="vt-card__body">
-                  It unlocks at kickoff, {VIDEOTHON.kickoffLabel}. 
+                  Unlocks at kickoff, {VIDEOTHON.kickoffLabel}. 
                 </p>
               </div>
             </div>
           </>
         )}
 
-        {VIDEOTHON.whatsappLink ? (
+        {/* {VIDEOTHON.whatsappLink ? (
           <Link
             href={VIDEOTHON.whatsappLink}
             target="_blank"
@@ -170,7 +170,7 @@ export default async function VideothonDashboardPage() {
               <path d="M4 12h15M13 6l6 6-6 6" />
             </svg>
           </Link>
-        ) : null}
+        ) : null} */}
       </section>
 
       {/* ============ SUBMISSION ============ */}
@@ -230,7 +230,7 @@ export default async function VideothonDashboardPage() {
             <span className="vt-schedule__pip" aria-hidden />
             <div>
               <p className="vt-schedule__label">Halfway check-in</p>
-              <p className="vt-schedule__value">Optional pulse in WhatsApp</p>
+              {/* <p className="vt-schedule__value">Optional pulse in WhatsApp</p> */}
             </div>
           </li>
           <li className={phase === "ended" ? "is-past" : phase === "live" ? "is-next" : ""}>

@@ -47,8 +47,7 @@ export const VIDEOTHON = {
   // The current build assumes ONE open prompt announced on WhatsApp; the
   // dashboard renders the string below directly, no picker. Wire in briefs
   // (like the code hackathon's HackathonProblem rows) as a follow-up.
-  brief: "The brief lands in the WhatsApp group at kickoff.",
-
+  brief: "Create a video to demonstrate ABTalks.in website at your creativity and skills.",
   // TODO(organizer): sponsor slot. Set `enabled: false` to hide the panel.
   sponsor: {
     enabled: false as boolean,

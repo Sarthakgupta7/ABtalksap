@@ -52,8 +52,10 @@
 .lib-frame { overflow-x: clip; overflow-y: visible; }
 .lib-strip { transform: translateX(var(--lib-offset, 0)); }
 .lib-tile { z-index: 1; }
+/* Grows around the image's own centre (Netflix-style): the enlarged art
+   stays centred on the tile's spot, the details hang beneath it. */
 .lib-tile__card {
-  transform-origin: center top;
+  transform-origin: center center;
   transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s ease;
 }
 .lib-tile__details {
@@ -73,7 +75,8 @@
 .lib-tile:hover, .lib-tile:focus-within { z-index: 30; }
 .lib-tile:hover .lib-tile__card,
 .lib-tile:focus-within .lib-tile__card {
-  transform: scale(1.3);
+  /* Lift so the whole popup (art + details) sits centred on the tile. */
+  transform: translateY(-38%) scale(1.3);
   transition-delay: 0.12s;
   box-shadow: 0 26px 50px -24px rgba(0, 0, 0, 0.45);
 }
@@ -87,8 +90,8 @@
   transition: opacity 0.2s ease 0.12s, transform 0.25s ease 0.12s, visibility 0s 0.12s;
 }
 /* Keep the first and last tiles' growth inside the page. */
-.lib-strip > .lib-tile:first-child .lib-tile__card { transform-origin: left top; }
-.lib-strip > .lib-tile:last-child .lib-tile__card { transform-origin: right top; }
+.lib-strip > .lib-tile:first-child .lib-tile__card { transform-origin: left center; }
+.lib-strip > .lib-tile:last-child .lib-tile__card { transform-origin: right center; }
 
 @media (hover: hover) and (min-width: 768px) {
   .lib-edge { display: flex; }

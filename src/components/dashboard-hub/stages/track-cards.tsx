@@ -4,10 +4,8 @@ import { ArrowRight, Check } from "lucide-react";
 import { isClaudeEnabled } from "@/lib/feature-flags";
 import { JoinClaudeButton } from "@/components/dashboard-hub/join-claude-button";
 
-/* The four 60-day tracks as cover cards. At rest only the cover shows
-   (artwork + title); on hover or keyboard focus a white details panel
-   drops down from under the cover. On touch screens (no hover) the
-   details are always shown. Styling lives in stages.css (.track-card). */
+/* Three suggested 60-day tracks as static cards: a dark cover (artwork +
+   title) on top of a white details body. No hover animation. */
 
 type Track = {
   domain: Domain;
@@ -87,50 +85,53 @@ const TRACKS: Track[] = [
 
 export function TrackCards({ abandoned }: { abandoned: Domain[] }) {
   const removed = new Set(abandoned);
-  const tracks = TRACKS.filter((t) => t.domain !== "CLAUDE" || isClaudeEnabled());
+  // Three suggestions (Claude only when live).
+  const tracks = TRACKS.filter((t) => t.domain !== "CLAUDE" || isClaudeEnabled()).slice(0, 3);
   return (
-    <ul id="domains" className="grid scroll-mt-24 gap-5 pb-2 sm:grid-cols-2 xl:grid-cols-4">
+    <ul id="domains" className="grid scroll-mt-24 gap-6 md:grid-cols-2 xl:grid-cols-3">
       {tracks.map((t, i) => (
-        <li key={t.domain} className="track-card group relative" tabIndex={0}>
+        <li
+          key={t.domain}
+          className="flex flex-col overflow-hidden rounded-3xl bg-white shadow-[0_18px_40px_-26px_rgba(0,0,0,0.35)] ring-1 ring-black/[0.04]"
+        >
           {/* Cover */}
           <div
-            className="track-card__cover relative flex aspect-[4/3] flex-col justify-end overflow-hidden rounded-2xl p-5 text-white shadow-[0_18px_36px_-24px_rgba(0,0,0,0.6)]"
+            className="relative flex min-h-[220px] flex-col justify-center overflow-hidden px-7 py-8 text-white"
             style={{ background: t.bg }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- static cover art */}
-            <img src={t.cover} alt="" className="absolute inset-0 size-full object-cover object-right opacity-90 transition-transform duration-500 group-hover:scale-[1.04]" />
-            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.05)_0%,rgba(0,0,0,0.35)_45%,rgba(0,0,0,0.85)_100%)]" aria-hidden="true" />
+            <img src={t.cover} alt="" className="absolute inset-0 size-full object-cover object-right" />
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.55)_45%,rgba(0,0,0,0)_80%)]" aria-hidden="true" />
             <div className="relative">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/75">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
                 {String(i + 1).padStart(2, "0")} / Career track
               </p>
-              <h4 className="mt-1 font-heading text-2xl font-bold leading-tight">{t.title}</h4>
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#1FB6C9]">{t.kicker}</p>
-              <p className="mt-1 text-xs text-white/80">{t.tagline}</p>
+              <h4 className="mt-1.5 max-w-[16ch] font-heading text-[32px] font-bold leading-[1.1]">{t.title}</h4>
+              <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#1FB6C9]">{t.kicker}</p>
+              <p className="mt-1.5 text-sm text-white/80">{t.tagline}</p>
             </div>
           </div>
 
-          {/* Details — drop down from under the cover on hover / focus */}
-          <div className="track-card__details rounded-b-2xl bg-white px-5 pb-5 pt-4 shadow-[0_24px_40px_-20px_rgba(0,0,0,0.35)]">
+          <div className="flex flex-1 flex-col px-7 pb-6 pt-5">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#6B7280]">What you learn:</p>
-            <ul className="mt-2 flex flex-wrap gap-1.5">
+            <ul className="mt-2.5 flex flex-wrap gap-2">
               {t.skills.map((k) => (
-                <li key={k} className="rounded-md border border-[#E3E7E7] bg-[#F7F8F8] px-2 py-1 text-[11px] text-[#1F1F1F]">
+                <li key={k} className="rounded-md border border-[#E3E7E7] bg-[#F7F8F8] px-3 py-1.5 text-xs text-[#1F1F1F]">
                   {k}
                 </li>
               ))}
             </ul>
-            <ul className="mt-3 space-y-1.5">
+            <ul className="mt-5 space-y-3">
               {t.outcomes.map((o) => (
-                <li key={o} className="flex items-start gap-2 text-xs text-[#1F1F1F]">
-                  <Check className="mt-0.5 size-3.5 shrink-0 text-[#6B7280]" aria-hidden="true" />
+                <li key={o} className="flex items-start gap-3 text-sm text-[#1F1F1F]">
+                  <Check className="mt-0.5 size-4 shrink-0 text-[#6B7280]" aria-hidden="true" />
                   {o}
                 </li>
               ))}
             </ul>
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <Link href={t.path} className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold text-[#03535F] hover:underline">
-                More Details <ArrowRight className="size-3.5" aria-hidden="true" />
+            <div className="mt-auto flex items-center justify-end gap-6 pt-6">
+              <Link href={t.path} className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-semibold text-[#03535F] hover:underline">
+                More Details <ArrowRight className="size-4" aria-hidden="true" />
               </Link>
               {removed.has(t.domain) ? (
                 <Link href={t.path} className={ENROLL}>View status</Link>
@@ -148,4 +149,4 @@ export function TrackCards({ abandoned }: { abandoned: Domain[] }) {
 }
 
 const ENROLL =
-  "inline-flex h-10 items-center justify-center whitespace-nowrap rounded-xl bg-[linear-gradient(180deg,#0E6B76_0%,#03535F_100%)] px-5 text-sm font-semibold text-white shadow-[inset_0_-4px_12px_rgba(0,0,0,0.25),0_8px_18px_-10px_rgba(3,83,95,0.8)] transition-colors hover:bg-[#076573] disabled:opacity-60";
+  "inline-flex h-12 items-center justify-center whitespace-nowrap rounded-xl bg-[linear-gradient(180deg,#0E6B76_0%,#03535F_100%)] px-8 text-sm font-semibold text-white shadow-[inset_0_-4px_12px_rgba(0,0,0,0.25),0_8px_18px_-10px_rgba(3,83,95,0.8)] transition-colors hover:bg-[#076573] disabled:opacity-60";

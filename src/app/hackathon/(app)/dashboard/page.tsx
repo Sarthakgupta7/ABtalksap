@@ -200,7 +200,7 @@ export default async function VideothonDashboardPage() {
             fine; credit it in the notes.
           </li>
           <li>
-            <strong>Everything inside the 48 hours.</strong> Cut, grade, sound
+            <strong>Everything inside the 24 hours.</strong> Cut, grade, sound
             and export happen after kickoff. Disclose any pre-built templates.
           </li>
           <li>
@@ -314,7 +314,7 @@ export default async function VideothonDashboardPage() {
               <div>
                 <p className="vt-ticket__stub-label">Admit</p>
                 <p className="vt-ticket__stub-big">One</p>
-                <p className="vt-ticket__stub-label">Solo entry · 48 hrs</p>
+                <p className="vt-ticket__stub-label">Solo entry · 24 hrs</p>
               </div>
               <span className="vt-ticket__barcode" />
             </div>

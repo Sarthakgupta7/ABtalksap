@@ -90,8 +90,8 @@ export function VideoSubmissionForm({ initial, editable, closed }: Props) {
           <div>
             <h2 className="vt-card__title">Submissions open at kickoff</h2>
             <p className="vt-card__body">
-              Once the clock starts you can paste one public link here and
-              re-save it as often as you like until the deadline.
+              Once the clock starts you can paste one public link here 
+              
             </p>
           </div>
         </div>

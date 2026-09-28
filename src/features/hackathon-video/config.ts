@@ -21,19 +21,19 @@ export const VIDEOTHON = {
 
   // TODO(organizer): rename if the event is called anything other than VideoThon.
   name: "VideoThon",
-  tagline: "48 hours. One brief. Cut something worth watching.",
+  tagline: "24 hours. One brief. Cut something worth watching.",
 
   // Manual kill switch (cutover / emergency). Time gate is registrationClosesUtc.
   registrationOpen: true,
 
-  // Event window (confirmed 2026-09-25): kickoff Fri 9 Oct 8:00 PM IST,
-  // deadline Sun 11 Oct 8:45 PM IST. UTC = IST − 5:30.
+  // Event window (changed 2026-09-28 to 24 hours): kickoff Fri 9 Oct
+  // 8:00 PM IST, deadline Sat 10 Oct 8:00 PM IST. UTC = IST − 5:30.
   kickoffUtc: "2026-10-09T14:30:00Z", // Fri 9 Oct · 8:00 PM IST
-  deadlineUtc: "2026-10-11T15:15:00Z", // Sun 11 Oct · 8:45 PM IST
+  deadlineUtc: "2026-10-10T14:30:00Z", // Sat 10 Oct · 8:00 PM IST
   registrationClosesUtc: "2026-10-09T12:30:00Z", // Fri 9 Oct · 6:00 PM IST
 
   kickoffLabel: "Friday, 9 Oct · 8:00 PM IST",
-  deadlineLabel: "Sunday, 11 Oct · 8:45 PM IST",
+  deadlineLabel: "Saturday, 10 Oct · 8:00 PM IST",
   resultsLabel: "Winners announced: Friday, 16 Oct",
   registrationClosesLabel: "Registration closes Friday, 9 Oct · 6:00 PM IST",
 

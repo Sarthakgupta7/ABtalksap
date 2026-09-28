@@ -1,12 +1,13 @@
 "use client";
 
+import { useRef } from "react";
 import Link from "next/link";
-import { ArrowRight, BarChart3, Blocks, Bot, Code2, Network, Sparkles, Timer, Zap } from "lucide-react";
+import { ArrowRight, BarChart3, Blocks, Bot, ChevronLeft, ChevronRight, Code2, Network, Sparkles, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/* "Browse through our Library": a Cohorts / Challenges toggle over
-   folder-shaped cards (tab rising from the top-left). Data is plain
-   so it can cross the server → client boundary; icons are picked here. */
+/* Netflix-style library: two rows on a dark stage, each a horizontally
+   scrolling strip of tiles with edge arrows. Data is plain so it can cross
+   the server → client boundary; icons and art are picked here. */
 
 export type LibraryArt = "snowflake" | "databricks" | "ai" | "se" | "ds" | "claude" | "hackathon" | "cohort";
 
@@ -23,11 +24,15 @@ export type LibraryItem = {
   modules: number | null;
 };
 
-const IMAGE: Partial<Record<LibraryArt, string>> = {
-  snowflake: "/dashboard/snowflake.png",
-  databricks: "/dashboard/databricks.png",
-  cohort: "/dashboard/ai-cohort.svg",
-  ai: "/dashboard/ai-cohort.svg",
+/** Tile artwork. `logo` art sits on white and is shown whole; covers fill. */
+const ART: Partial<Record<LibraryArt, { src: string; logo: boolean }>> = {
+  snowflake: { src: "/dashboard/snowflake.png", logo: true },
+  databricks: { src: "/dashboard/databricks.png", logo: true },
+  cohort: { src: "/dashboard/ai-cohort.svg", logo: true },
+  ai: { src: "/dashboard/ai-track.jpg", logo: false },
+  se: { src: "/dashboard/track-thumb.png", logo: false },
+  ds: { src: "/dashboard/track-ds.svg", logo: false },
+  claude: { src: "/dashboard/track-claude.svg", logo: false },
 };
 
 const ICON: Record<LibraryArt, typeof Code2> = {
@@ -41,89 +46,135 @@ const ICON: Record<LibraryArt, typeof Code2> = {
   cohort: Bot,
 };
 
-/* The library holds two distinct shelves, stacked: Job Skills (cohorts)
-   and Personal Skills (challenges), each with its own "How it works". */
-const SHELVES = {
+const ROWS = {
   job: {
-    title: "Job",
-    accent: "Skills",
-    how: "Short, mentor-led cohorts built around the tools employers hire for. Each one runs for a fixed number of days: follow the modules, ship a real project on the platform, and finish with a portfolio piece recruiters can see.",
-    tone: "bg-[linear-gradient(135deg,#E3F2F2_0%,#F4FAFA_100%)] border-[#D3E8E8]",
-    ink: "text-[#03535F]",
-    dot: "bg-[#03535F]",
+    title: "Get job-ready, fast",
+    sub: "Mentor-led cohorts on the tools employers hire for — finish with a project recruiters can see.",
   },
   personal: {
-    title: "Personal",
-    accent: "Skills",
-    how: "Self-paced challenges that build the habit of shipping. Pick a track, complete one task a day, share proof on GitHub and LinkedIn, and grow your streak — or test yourself against the clock in a hackathon.",
-    tone: "bg-[linear-gradient(135deg,#FFF1E4_0%,#FFF9F3_100%)] border-[#F5DFC9]",
-    ink: "text-[#B25A0B]",
-    dot: "bg-[#E08A12]",
+    title: "Level up, one day at a time",
+    sub: "Self-paced challenges and hackathons that build the habit of shipping.",
   },
 } as const;
 
 export function Library({ cohorts, challenges }: { cohorts: LibraryItem[]; challenges: LibraryItem[] }) {
   return (
-    <section id="events" className="scroll-mt-24 pt-4">
-      {/* A white folder: the heading sits in its flap (top-left), which
-          slopes down into the body with a curved, angled join. */}
-      <div className="relative min-w-0 w-fit">
-        <div className="relative rounded-tl-[22px] bg-white px-5 pb-[17px] pt-6 sm:px-8">
-          <h3 className="font-heading text-xl font-bold leading-tight tracking-tight text-black sm:text-2xl lg:whitespace-nowrap">
-            Browse through our <span className="text-[#03535F]">Library</span> and see more{" "}
-            <span className="text-[#03535F]">suggested content</span>
-          </h3>
-          <svg
-            viewBox="0 0 64 100"
-            preserveAspectRatio="none"
-            className="absolute left-[calc(100%-1px)] top-0 h-full w-20"
-            aria-hidden="true"
-          >
-            <path d="M0 0 H4 C 26 0, 30 100, 64 100 H0 Z" fill="#FFFFFF" />
-          </svg>
-        </div>
+    <section
+      id="events"
+      className="scroll-mt-24 overflow-hidden rounded-[28px] bg-[radial-gradient(120%_80%_at_0%_0%,#123238_0%,#0A1215_55%,#070B0D_100%)] py-7 text-white sm:py-9"
+    >
+      <div className="px-5 sm:px-8">
+        <h3 className="font-heading text-2xl font-bold tracking-tight sm:text-[28px]">
+          Your next <span className="text-[#2BD4A0]">binge-worthy</span> skill
+        </h3>
+        <p className="mt-1 text-sm text-white/65">Pick up something new — every title here is built to get you hired.</p>
       </div>
-
-      <div className="-mt-px space-y-6 rounded-b-[28px] rounded-tr-[28px] bg-white px-5 pb-6 pt-5 sm:px-8 sm:pb-8">
-        <Shelf id="prep-kit" shelf={SHELVES.job} items={cohorts.slice(0, 3)} />
-        <Shelf id="domains-library" shelf={SHELVES.personal} items={challenges} />
-      </div>
+      <Row id="prep-kit" row={ROWS.job} items={cohorts} />
+      <Row id="domains-library" row={ROWS.personal} items={challenges} />
     </section>
   );
 }
 
-function Shelf({
-  id,
-  shelf,
-  items,
-}: {
-  id: string;
-  shelf: (typeof SHELVES)[keyof typeof SHELVES];
-  items: LibraryItem[];
-}) {
+function Row({ id, row, items }: { id: string; row: (typeof ROWS)[keyof typeof ROWS]; items: LibraryItem[] }) {
+  const strip = useRef<HTMLUListElement>(null);
+  const scroll = (dir: 1 | -1) =>
+    strip.current?.scrollBy({ left: dir * strip.current.clientWidth * 0.85, behavior: "smooth" });
+
+  if (items.length === 0) return null;
   return (
-    <section id={id} className={cn("scroll-mt-24 rounded-3xl border p-5 sm:p-7", shelf.tone)}>
-      <div className="mx-auto max-w-3xl text-center">
-        <h4 className="font-heading text-2xl font-bold tracking-tight text-black sm:text-[28px]">
-          {shelf.title} <span className={shelf.ink}>{shelf.accent}</span>
-        </h4>
-        <p className={cn("mt-4 flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.2em]", shelf.ink)}>
-          <span className={cn("size-1.5 rounded-full", shelf.dot)} aria-hidden="true" />
-          How it works
-          <span className={cn("size-1.5 rounded-full", shelf.dot)} aria-hidden="true" />
-        </p>
-        <p className="mt-2 text-base leading-relaxed text-[#1F1F1F] sm:text-lg">{shelf.how}</p>
+    <div id={id} className="group/row mt-8 scroll-mt-24">
+      <div className="flex items-end justify-between gap-4 px-5 sm:px-8">
+        <div className="min-w-0">
+          <h4 className="font-heading text-xl font-bold sm:text-2xl">{row.title}</h4>
+          <p className="mt-0.5 text-sm text-white/60">{row.sub}</p>
+        </div>
       </div>
-      {items.length === 0 ? (
-        <p className="mt-6 text-center text-sm text-[#6B7280]">Nothing here right now — check back soon.</p>
-      ) : (
-        <ul className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3 xl:gap-6">
+      <div className="relative mt-4">
+        <ul
+          ref={strip}
+          className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-5 px-5 py-3 sm:scroll-px-8 sm:px-8"
+        >
           {items.map((it) => (
-            <FolderCard key={it.key} item={it} />
+            <Tile key={it.key} item={it} />
           ))}
         </ul>
+        <EdgeButton side="left" onClick={() => scroll(-1)} />
+        <EdgeButton side="right" onClick={() => scroll(1)} />
+      </div>
+    </div>
+  );
+}
+
+function EdgeButton({ side, onClick }: { side: "left" | "right"; onClick: () => void }) {
+  const Icon = side === "left" ? ChevronLeft : ChevronRight;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={side === "left" ? "Scroll left" : "Scroll right"}
+      className={cn(
+        "absolute inset-y-3 z-10 hidden w-12 items-center justify-center text-white opacity-0 transition-opacity focus-visible:opacity-100 group-hover/row:opacity-100 md:flex",
+        side === "left"
+          ? "left-0 bg-[linear-gradient(90deg,rgba(7,11,13,0.9),transparent)]"
+          : "right-0 bg-[linear-gradient(270deg,rgba(7,11,13,0.9),transparent)]",
       )}
-    </section>
+    >
+      <Icon className="size-8" aria-hidden="true" />
+    </button>
+  );
+}
+
+function Tile({ item }: { item: LibraryItem }) {
+  const art = ART[item.art];
+  const Icon = ICON[item.art];
+  const meta = [
+    item.days !== null ? `${item.days} days` : null,
+    item.modules !== null ? `${item.modules} modules` : null,
+    item.kicker,
+  ].filter(Boolean);
+  return (
+    <li className="w-[260px] shrink-0 snap-start sm:w-[290px]">
+      <Link
+        href={item.href}
+        className="group/tile block overflow-hidden rounded-xl bg-[#141B1E] shadow-[0_12px_28px_-16px_rgba(0,0,0,0.8)] ring-1 ring-white/10 transition-[transform,box-shadow] duration-300 hover:z-10 hover:scale-[1.05] hover:shadow-[0_24px_48px_-20px_rgba(0,0,0,0.9)] hover:ring-white/25 focus-visible:scale-[1.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2BD4A0]"
+      >
+        <div className={cn("relative aspect-[16/9] overflow-hidden", art?.logo ? "bg-white" : "bg-[#0A0F12]")}>
+          {art ? (
+            // eslint-disable-next-line @next/next/no-img-element -- static tile art
+            <img
+              src={art.src}
+              alt=""
+              className={cn("absolute inset-0 size-full", art.logo ? "object-contain p-2" : "object-cover object-right")}
+            />
+          ) : (
+            <GlossyArt Icon={Icon} tint={TINT[item.art]} />
+          )}
+          <span className="absolute left-2.5 top-2.5 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white">
+            {item.kicker}
+          </span>
+        </div>
+        <div className="p-3.5">
+          <p className="truncate font-heading text-base font-bold">{item.title}</p>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-white/60">
+            {meta.map((m, i) => (
+              <span key={m} className="flex items-center gap-1.5">
+                {i > 0 ? <span className="size-1 rounded-full bg-white/40" aria-hidden="true" /> : null}
+                {m}
+              </span>
+            ))}
+          </p>
+          {/* Revealed on hover, Netflix-style */}
+          <div className="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 group-hover/tile:grid-rows-[1fr] group-focus-visible/tile:grid-rows-[1fr]">
+            <div className="overflow-hidden">
+              <p className="mt-2 line-clamp-2 text-xs text-white/75">{item.blurb}</p>
+              <span className="mt-3 inline-flex h-8 items-center gap-1 rounded-full bg-white px-3.5 text-xs font-bold text-[#0A1215]">
+                {item.cta} <ArrowRight className="size-3.5" aria-hidden="true" />
+              </span>
+            </div>
+          </div>
+        </div>
+      </Link>
+    </li>
   );
 }
 
@@ -169,60 +220,3 @@ function GlossyArt({ Icon, tint }: { Icon: typeof Code2; tint: (typeof TINT)[Lib
   );
 }
 
-function FolderCard({ item }: { item: LibraryItem }) {
-  const img = IMAGE[item.art];
-  const Icon = ICON[item.art];
-  return (
-    <li>
-      <article className="relative flex h-full overflow-hidden rounded-2xl border border-[#E6E9E9] bg-white shadow-[0_10px_24px_-20px_rgba(0,0,0,0.35)]">
-        <div className="relative w-[34%] shrink-0 overflow-hidden bg-[#FAFBFC]">
-          {img ? (
-            // eslint-disable-next-line @next/next/no-img-element -- small static artwork
-            <img src={img} alt="" className="absolute inset-0 size-full object-contain" />
-          ) : (
-            <GlossyArt Icon={Icon} tint={TINT[item.art]} />
-          )}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col px-4 py-3.5">
-          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#03535F]">{item.kicker}</p>
-          <h4 className="mt-1 font-heading text-lg font-bold leading-tight text-black">{item.title}</h4>
-          <p className="mt-1 line-clamp-2 text-xs leading-snug text-[#4B4B4B]">{item.blurb}</p>
-
-          <div className="mt-auto flex flex-wrap items-end justify-between gap-x-2 gap-y-2 pt-3">
-          <div className="flex items-center gap-3 text-black">
-            {item.days !== null ? (
-              <span className="flex items-center gap-1.5">
-                <Timer className="size-4" aria-hidden="true" />
-                <span className="leading-none">
-                  <span className="block text-[8px] font-semibold uppercase text-[#6B7280]">{item.days} days</span>
-                  <span className="block text-[10px] font-bold uppercase">{item.daysLabel}</span>
-                </span>
-              </span>
-            ) : null}
-            {item.modules !== null ? (
-              <>
-                <span className="h-5 w-px bg-[#D9DEDE]" aria-hidden="true" />
-                <span className="flex items-center gap-1.5">
-                  <Blocks className="size-4" aria-hidden="true" />
-                  <span className="leading-none">
-                    <span className="block text-[8px] font-semibold uppercase text-[#6B7280]">{item.modules}</span>
-                    <span className="block text-[10px] font-bold uppercase">Modules</span>
-                  </span>
-                </span>
-              </>
-            ) : null}
-          </div>
-
-            <Link
-              href={item.href}
-              className="ml-auto inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-[linear-gradient(180deg,#BFE3E3_0%,#9CCFD0_100%)] px-3 text-[11px] font-semibold text-[#03535F] shadow-[inset_0_-3px_8px_rgba(3,83,95,0.18),inset_0_1px_1px_rgba(255,255,255,0.6)] transition-[filter] hover:brightness-95"
-            >
-              {item.cta}
-              <ArrowRight className="size-3" aria-hidden="true" />
-            </Link>
-          </div>
-        </div>
-      </article>
-    </li>
-  );
-}

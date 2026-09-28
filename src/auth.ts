@@ -116,8 +116,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             // `evaluateGoogleLink` narrows this to exactly that case and denies
             // every other existing-email link, as Auth.js did before.
             allowDangerousEmailAccountLinking: true,
-            // Plan 154 — see auth.config.ts and the signIn callback below.
-            allowDangerousEmailAccountLinking: isEmailLoginEnabled(),
           }),
         ]
       : []),

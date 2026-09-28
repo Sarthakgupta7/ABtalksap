@@ -1,6 +1,10 @@
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { HACKATHON } from "@/components/hackathon/hackathon-config";
 import { EVENTS } from "@/components/workshop/events-data";
+import {
+  VIDEOTHON,
+  isVideothonRegistrationOpen,
+} from "@/features/hackathon-video/config";
 import { IST, addCalendarDaysToKey } from "@/lib/date-utils";
 import type { AppNotification } from "./types";
 import { PROGRAM_AI_COHORT_BASE } from "@/features/program/constants";
@@ -36,6 +40,8 @@ export type DeriveEventNotificationsInput = {
   isHackathonRegistered: boolean;
   /** `ProgramMember.cohortId`s this user already belongs to (any status). */
   joinedCohortIds: Set<string>;
+  /** True when the user has a HackathonVideoRegistration for the current VideoThon. */
+  isVideothonRegistered: boolean;
 };
 
 /** How many days before a workshop its notification starts showing. */
@@ -44,6 +50,11 @@ const WORKSHOP_LEAD_DAYS = 7;
 const HACKATHON_KICKOFF_LEAD_DAYS = 3;
 /** How many hours before the deadline the submission reminder starts showing. */
 const HACKATHON_DEADLINE_LEAD_HOURS = 12;
+/**
+ * The VideoThon "registration is open" item is timestamped this many days
+ * before registration closes (or now, if later), so it sorts as recent news.
+ */
+const VIDEOTHON_REGISTRATION_LEAD_DAYS = 14;
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -62,6 +73,7 @@ export function deriveEventNotifications(
     registeredWorkshopEventIds,
     isHackathonRegistered,
     joinedCohortIds,
+    isVideothonRegistered,
   } = input;
   const items: DerivedNotification[] = [];
   const todayKey = formatInTimeZone(now, IST, "yyyy-MM-dd");
@@ -137,6 +149,72 @@ export function deriveEventNotifications(
       href: "/hackathon/dashboard",
       category: "HACKATHON",
       publishedAt: deadlineOpens.toISOString(),
+    });
+  }
+
+  // ---- VideoThon -----------------------------------------------------------
+  // Same shape as the code hackathon above: "register now" for everyone who
+  // has not registered, then kickoff / live / deadline reminders for
+  // registrants only. Keys carry the eventId so the next VideoThon arrives
+  // unread instead of inheriting this one's read state.
+  const vtId = VIDEOTHON.eventId;
+  const vtKickoff = new Date(VIDEOTHON.kickoffUtc);
+  const vtDeadline = new Date(VIDEOTHON.deadlineUtc);
+  const vtRegistrationCloses = new Date(VIDEOTHON.registrationClosesUtc);
+
+  if (!isVideothonRegistered && isVideothonRegistrationOpen(now.getTime())) {
+    items.push({
+      key: `videothon:${vtId}:registration`,
+      title: `${VIDEOTHON.name} registration is open`,
+      body: `${VIDEOTHON.kickoffLabel} kickoff · ${VIDEOTHON.registrationClosesLabel}`,
+      href: "/hackathon",
+      category: "HACKATHON",
+      publishedAt: new Date(
+        Math.min(
+          vtRegistrationCloses.getTime() - VIDEOTHON_REGISTRATION_LEAD_DAYS * 24 * HOUR_MS,
+          now.getTime(),
+        ),
+      ).toISOString(),
+    });
+  }
+
+  const vtKickoffOpens = new Date(
+    vtKickoff.getTime() - HACKATHON_KICKOFF_LEAD_DAYS * 24 * HOUR_MS,
+  );
+  const vtDeadlineOpens = new Date(
+    vtDeadline.getTime() - HACKATHON_DEADLINE_LEAD_HOURS * HOUR_MS,
+  );
+
+  if (isVideothonRegistered && now >= vtKickoffOpens && now < vtKickoff) {
+    items.push({
+      key: `videothon:${vtId}:kickoff`,
+      title: `${VIDEOTHON.name} kicks off soon`,
+      body: VIDEOTHON.kickoffLabel,
+      href: "/hackathon/dashboard",
+      category: "HACKATHON",
+      publishedAt: vtKickoffOpens.toISOString(),
+    });
+  }
+
+  if (isVideothonRegistered && now >= vtKickoff && now < vtDeadlineOpens) {
+    items.push({
+      key: `videothon:${vtId}:live`,
+      title: `${VIDEOTHON.name} is live — the brief is out`,
+      body: `Submit before ${VIDEOTHON.deadlineLabel}`,
+      href: "/hackathon/dashboard",
+      category: "HACKATHON",
+      publishedAt: vtKickoff.toISOString(),
+    });
+  }
+
+  if (isVideothonRegistered && now >= vtDeadlineOpens && now < vtDeadline) {
+    items.push({
+      key: `videothon:${vtId}:deadline`,
+      title: `${VIDEOTHON.name} submissions close soon`,
+      body: VIDEOTHON.deadlineLabel,
+      href: "/hackathon/dashboard",
+      category: "HACKATHON",
+      publishedAt: vtDeadlineOpens.toISOString(),
     });
   }
 

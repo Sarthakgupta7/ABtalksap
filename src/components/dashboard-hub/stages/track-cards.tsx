@@ -100,7 +100,7 @@ export function TrackCards({ abandoned }: { abandoned: Domain[] }) {
             style={{ background: t.bg }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- static cover art */}
-            <img src={t.cover} alt="" className="absolute inset-0 size-full object-cover object-right" />
+            <img src={t.cover} alt="" className="absolute inset-0 size-full object-cover object-right brightness-[0.6]" />
             <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.55)_45%,rgba(0,0,0,0)_80%)]" aria-hidden="true" />
             <div className="relative">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/75">
@@ -121,16 +121,16 @@ export function TrackCards({ abandoned }: { abandoned: Domain[] }) {
                 </li>
               ))}
             </ul>
-            <ul className="mt-5 space-y-3">
+            <ul className="mt-5 space-y-2.5">
               {t.outcomes.map((o) => (
-                <li key={o} className="flex items-start gap-3 text-sm text-[#1F1F1F]">
-                  <Check className="mt-0.5 size-4 shrink-0 text-[#6B7280]" aria-hidden="true" />
+                <li key={o} className="flex items-start gap-2.5 text-[13px] text-[#1F1F1F]">
+                  <Check className="mt-0.5 size-3.5 shrink-0 text-[#6B7280]" aria-hidden="true" />
                   {o}
                 </li>
               ))}
             </ul>
             <div className="mt-auto flex items-center justify-end gap-6 pt-6">
-              <Link href={t.path} className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-semibold text-[#03535F] hover:underline">
+              <Link href={t.path} className="inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] font-semibold text-[#03535F] hover:underline">
                 More Details <ArrowRight className="size-4" aria-hidden="true" />
               </Link>
               {removed.has(t.domain) ? (
@@ -149,4 +149,4 @@ export function TrackCards({ abandoned }: { abandoned: Domain[] }) {
 }
 
 const ENROLL =
-  "inline-flex h-12 items-center justify-center whitespace-nowrap rounded-xl bg-[linear-gradient(180deg,#0E6B76_0%,#03535F_100%)] px-8 text-sm font-semibold text-white shadow-[inset_0_-4px_12px_rgba(0,0,0,0.25),0_8px_18px_-10px_rgba(3,83,95,0.8)] transition-colors hover:bg-[#076573] disabled:opacity-60";
+  "inline-flex h-10 items-center justify-center whitespace-nowrap rounded-xl bg-[linear-gradient(180deg,#0E6B76_0%,#03535F_100%)] px-5 text-[13px] font-semibold text-white shadow-[inset_0_-4px_12px_rgba(0,0,0,0.25),0_8px_18px_-10px_rgba(3,83,95,0.8)] transition-colors hover:bg-[#076573] disabled:opacity-60";

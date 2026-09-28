@@ -132,7 +132,7 @@ function Tile({ item }: { item: LibraryItem }) {
     <li className="w-[260px] shrink-0 snap-start sm:w-[290px]">
       <Link
         href={item.href}
-        className="group/tile block overflow-hidden rounded-xl bg-[#141B1E] text-white shadow-[0_12px_28px_-16px_rgba(0,0,0,0.6)] ring-1 ring-black/5 transition-[transform,box-shadow] duration-300 hover:z-10 hover:scale-[1.05] hover:shadow-[0_24px_48px_-20px_rgba(0,0,0,0.9)] hover:ring-white/25 focus-visible:scale-[1.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2BD4A0]"
+        className="group/tile block overflow-hidden rounded-xl bg-white text-black shadow-[0_12px_28px_-18px_rgba(0,0,0,0.35)] ring-1 ring-black/[0.06] transition-[transform,box-shadow] duration-300 hover:z-10 hover:scale-[1.05] hover:shadow-[0_24px_44px_-22px_rgba(3,83,95,0.45)] hover:ring-[#03535F]/20 focus-visible:scale-[1.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2BD4A0]"
       >
         <div className={cn("relative aspect-[16/9] overflow-hidden", art?.logo ? "bg-white" : "bg-[#0A0F12]")}>
           {art ? (
@@ -151,10 +151,10 @@ function Tile({ item }: { item: LibraryItem }) {
         </div>
         <div className="p-3.5">
           <p className="truncate font-heading text-base font-bold">{item.title}</p>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-white/60">
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-[#6B7280]">
             {meta.map((m, i) => (
               <span key={m} className="flex items-center gap-1.5">
-                {i > 0 ? <span className="size-1 rounded-full bg-white/40" aria-hidden="true" /> : null}
+                {i > 0 ? <span className="size-1 rounded-full bg-[#C4CACA]" aria-hidden="true" /> : null}
                 {m}
               </span>
             ))}
@@ -162,8 +162,8 @@ function Tile({ item }: { item: LibraryItem }) {
           {/* Revealed on hover, Netflix-style */}
           <div className="grid grid-rows-[0fr] transition-[grid-template-rows] duration-300 group-hover/tile:grid-rows-[1fr] group-focus-visible/tile:grid-rows-[1fr]">
             <div className="overflow-hidden">
-              <p className="mt-2 line-clamp-2 text-xs text-white/75">{item.blurb}</p>
-              <span className="mt-3 inline-flex h-8 items-center gap-1 rounded-full bg-white px-3.5 text-xs font-bold text-[#0A1215]">
+              <p className="mt-2 line-clamp-2 text-xs text-[#4B4B4B]">{item.blurb}</p>
+              <span className="mt-3 inline-flex h-8 items-center gap-1 rounded-full bg-[#03535F] px-3.5 text-xs font-bold text-white shadow-[inset_0_-3px_8px_rgba(0,0,0,0.22)]">
                 {item.cta} <ArrowRight className="size-3.5" aria-hidden="true" />
               </span>
             </div>

@@ -11,10 +11,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { VideoRegistrationForm } from "@/components/hackathon-video/registration-form";
+import {
+  VideoRegistrationForm,
+  type VideoRegistrationPrefill,
+} from "@/components/hackathon-video/registration-form";
 import { cn } from "@/lib/utils";
 
-type Prefill = { fullName: string; email: string };
+type Prefill = VideoRegistrationPrefill;
 
 type Props = {
   /** True when the visitor has a live session (any Google-authed user). */
@@ -138,9 +141,7 @@ export function VideothonRegisterCTA({
             <DialogTitle className="vt-dialog__title">
               Register for VideoThon
             </DialogTitle>
-            <DialogDescription className="vt-dialog__sub">
-              Solo entry, individual competition. Fill this once and you're in.
-            </DialogDescription>
+            
           </DialogHeader>
           <div className="vt-dialog__body">
             {prefill ? (

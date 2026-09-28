@@ -6,6 +6,8 @@ import {
   isVideothonRegistrationOpen,
 } from "@/features/hackathon-video/config";
 import { getMyVideoRegistration } from "@/features/hackathon-video/get-my-registration";
+import { getVerifiedPhone } from "@/features/hackathon-video/get-verified-phone";
+import { isOtpVerificationRequired } from "@/lib/feature-flags";
 import { HackathonShell } from "@/components/hackathon-v2/hackathon-shell";
 import { FaqAccordion } from "@/components/hackathon-v2/faq-accordion";
 import { VideothonCountdown } from "@/components/hackathon-video/countdown";
@@ -118,9 +120,19 @@ export default async function HackathonPage() {
   const registration = userId ? await getMyVideoRegistration(userId) : null;
   const registered = registration !== null;
   const registrationOpen = isVideothonRegistrationOpen();
+  // Only needed while the form can still open.
+  const verifiedPhone =
+    userId && !registered && registrationOpen
+      ? await getVerifiedPhone(userId)
+      : null;
   const prefill =
     session?.user?.name && session.user.email
-      ? { fullName: session.user.name, email: session.user.email }
+      ? {
+          fullName: session.user.name,
+          email: session.user.email,
+          verifiedPhone,
+          phoneOtpRequired: isOtpVerificationRequired(),
+        }
       : null;
 
   const headerCta = (

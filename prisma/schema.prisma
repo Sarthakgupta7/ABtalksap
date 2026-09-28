@@ -1272,6 +1272,7 @@ model HackathonVideoRegistration {
   phoneCountryCode String                   // e.g. "+91"
   phoneNumber      String                   // digits only, no formatting
   city             String
+  state            String?                  // Indian state / UT; null on rows created before it was asked
   employment       HackathonVideoEmployment
   currentCtc       String?
   portfolioUrl     String

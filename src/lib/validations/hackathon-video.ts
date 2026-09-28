@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { legalAcceptanceSchema } from "@/lib/validations/legal";
 import { ACCEPTED_DIAL_CODES } from "@/features/hackathon-video/phone-countries";
+import { isKnownIndianState } from "@/data/india-locations";
+import { INDIA_DIALING_CODE } from "@/lib/validations/phone";
 
 /**
  * VideoThon (video editors hackathon) registration payload.
@@ -68,12 +70,29 @@ export const videoRegistrationSchema = z
     phoneCountryCode: phoneCountryCodeSchema,
     phoneNumber: phoneNumberSchema,
     city: trimmedString(120, "City is required"),
+    // Indian states / UTs only. Required for +91 numbers (see superRefine);
+    // participants from elsewhere may leave it blank.
+    state: z
+      .string()
+      .trim()
+      .optional()
+      .transform((v) => (v && v.length > 0 ? v : undefined))
+      .refine((v) => v === undefined || isKnownIndianState(v), {
+        message: "Pick your state from the list",
+      }),
     employment: z.enum(["LEARNER", "WORKING"]),
     currentCtc: currentCtcSchema,
     portfolioUrl: portfolioUrlSchema,
   })
   .merge(legalAcceptanceSchema)
   .superRefine((data, ctx) => {
+    if (data.phoneCountryCode === INDIA_DIALING_CODE && !data.state) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["state"],
+        message: "State is required",
+      });
+    }
     if (data.employment === "WORKING" && !data.currentCtc) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Domain } from "@prisma/client";
-import { ArrowRight, BarChart3, Check, Code2, Network, Sparkles } from "lucide-react";
+import { ArrowRight, BarChart3, Check, Code2, Network, Sparkles, Star } from "lucide-react";
 import { isClaudeEnabled, isProgramEnabled } from "@/lib/feature-flags";
 import { PROGRAM_AI_COHORT_BASE } from "@/features/program/constants";
 import type { HubEnrollment } from "@/features/dashboard/get-hub-data";
@@ -82,6 +82,82 @@ export function BuildSkillsPanel(props: BuildSkillsPanelProps) {
   );
 }
 
+/* Who the featured track is for — the middle column of its body. */
+/* Filled two-tone glyphs (same language as the stage illustrations). */
+function PeopleGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
+      <circle cx="16.5" cy="8" r="3" fill="#2BB39A" />
+      <path d="M12 19a4.5 4.5 0 0 1 9 0v1h-9z" fill="#2BB39A" />
+      <circle cx="9" cy="8.5" r="3.5" fill="#03535F" />
+      <path d="M3 20a6 6 0 0 1 12 0v.5H3z" fill="#03535F" />
+    </svg>
+  );
+}
+
+const AI_AUDIENCE: { title: string; body: string }[] = [
+  { title: "Students", body: "1st year to final year, starting out in AI" },
+  { title: "Recent graduates", body: "Building a portfolio for AI and ML roles" },
+  { title: "Developers", body: "Adding models, agents and data to their stack" },
+];
+
+function TrackAudience() {
+  return (
+    <div className="lg:border-l lg:border-[#E9EDED] lg:pl-10">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6B7280]">Who this course is for:</p>
+      <ul className="mt-3 space-y-2.5">
+        {AI_AUDIENCE.map(({ title, body }) => (
+          <li key={title} className="flex items-start gap-3">
+            <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-[#03535F]" aria-hidden="true" />
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-[#1F1F1F]">{title}</span>
+              <span className="block text-xs text-[#6B7280]">{body}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/* Social proof on the featured track.
+   TODO: placeholder figures from the design — replace with real counts. */
+const AI_RATING = { score: 4.8, ratings: 203806, learners: 659313 };
+
+function TrackStats() {
+  const fmt = (n: number) => n.toLocaleString("en-US");
+  return (
+    <div className="flex items-center gap-5 self-start rounded-2xl border border-[#E3EBEB] bg-[linear-gradient(180deg,#FBFDFD_0%,#F2F7F7_100%)] px-5 py-3 md:self-end">
+      <div className="flex items-center gap-3">
+        <span className="flex size-10 items-center justify-center rounded-xl bg-[#FFF4E2]" aria-hidden="true">
+          <Star className="size-5 fill-[#E08A12] text-[#E08A12]" />
+        </span>
+        <div>
+          <p className="flex items-center gap-2 leading-none">
+            <span className="font-heading text-xl font-bold text-[#1F1F1F]">{AI_RATING.score}</span>
+            <span className="flex gap-px" aria-label={`Rated ${AI_RATING.score} out of 5`}>
+              {Array.from({ length: 5 }, (_, i) => (
+                <Star key={i} className="size-3 fill-[#E08A12] text-[#E08A12]" aria-hidden="true" />
+              ))}
+            </span>
+          </p>
+          <p className="mt-1 text-xs text-[#6B7280]">{fmt(AI_RATING.ratings)} ratings</p>
+        </div>
+      </div>
+      <span className="h-9 w-px bg-[#D9E2E2]" aria-hidden="true" />
+      <div className="flex items-center gap-3">
+        <span className="flex size-10 items-center justify-center rounded-xl bg-[#E4F2F2]" aria-hidden="true">
+          <PeopleGlyph />
+        </span>
+        <div>
+          <p className="font-heading text-xl font-bold leading-none text-[#1F1F1F]">{fmt(AI_RATING.learners)}</p>
+          <p className="mt-1 text-xs text-[#6B7280]">learners</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Featured track (the one open pathway) ─────────────────── */
 
 const AI_SKILLS = ["Playwright", "Postman", "CI/CD", "SQL", "Selenium"];
@@ -117,7 +193,7 @@ function FeaturedTrack({ removed }: { removed: boolean }) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-6 px-6 py-6 sm:px-10 md:flex-row md:items-end md:justify-between">
+      <div className="grid gap-6 px-6 py-6 sm:px-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_auto] lg:gap-10">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6B7280]">What you learn:</p>
           <ul className="mt-2.5 flex flex-wrap gap-2">
@@ -136,6 +212,9 @@ function FeaturedTrack({ removed }: { removed: boolean }) {
             ))}
           </ul>
         </div>
+        <TrackAudience />
+        <div className="flex shrink-0 flex-col justify-between gap-6 lg:items-end">
+          <TrackStats />
         <div className="flex shrink-0 flex-col-reverse items-stretch gap-4 sm:flex-row sm:items-center sm:gap-6">
           <Link href="/ai" className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap text-sm font-semibold text-[#03535F] hover:underline">
             Syllabus &amp; Projects <ArrowRight className="size-4" aria-hidden="true" />
@@ -146,6 +225,7 @@ function FeaturedTrack({ removed }: { removed: boolean }) {
           >
             {removed ? "View status" : "Enroll Now"}
           </Link>
+        </div>
         </div>
       </div>
     </article>

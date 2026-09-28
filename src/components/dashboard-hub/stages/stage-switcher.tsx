@@ -77,6 +77,7 @@ type StageSwitcherProps = {
  * so the header's section links keep working whichever stage is open.
  */
 export function StageSwitcher({ stages, current, panels, profileScore }: StageSwitcherProps) {
+  const profileDone = profileScore >= 100;
   const [selected, setSelected] = useState<StageKey>(current);
   const railRef = useRef<HTMLDivElement>(null);
 
@@ -120,8 +121,13 @@ export function StageSwitcher({ stages, current, panels, profileScore }: StageSw
     <>
       <div ref={railRef} id="stages" className="scroll-mt-24">
         <div className="relative rounded-[28px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.46)_0%,rgba(255,255,255,0.28)_100%)] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(255,255,255,0.35),0_20px_44px_-20px_rgba(3,83,95,0.4)] backdrop-blur-[10px] backdrop-saturate-[1.3] sm:p-3">
-          <div role="tablist" aria-label="Your stages" className="grid gap-2.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
-            <ProfileTile score={profileScore} />
+          <div
+            role="tablist"
+            aria-label="Your stages"
+            className={cn("grid gap-2.5 sm:gap-3", profileDone ? "xl:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-4")}
+          >
+            {/* Once the profile is complete the tile steps aside. */}
+            {profileDone ? null : <ProfileTile score={profileScore} />}
             {stages.map((s) => {
               const Illustration = ILLUSTRATIONS[s.key];
               const active = s.key === selected;
@@ -143,7 +149,7 @@ export function StageSwitcher({ stages, current, panels, profileScore }: StageSw
                 >
                   <span
                     className={cn(
-                      "flex size-12 shrink-0 items-center justify-center rounded-xl [&_svg]:size-8",
+                      "flex size-16 shrink-0 items-center justify-center rounded-2xl [&_svg]:size-12",
                       active ? "bg-[#E8F3F2]" : "bg-white shadow-[0_4px_10px_-4px_rgba(0,0,0,0.25)]",
                     )}
                     aria-hidden="true"
@@ -179,7 +185,7 @@ export function StageSwitcher({ stages, current, panels, profileScore }: StageSw
             })}
           </div>
 
-          <StageRoad stages={stages} selected={selected} profileDone={profileScore >= 100} />
+          <StageRoad stages={stages} selected={selected} profileDone={profileDone} />
         </div>
       </div>
 
@@ -206,8 +212,8 @@ export function StageSwitcher({ stages, current, panels, profileScore }: StageSw
    stages walks it along the curve in small hops. */
 
 const ROAD_H = 30;
-// Under the three stage tiles (the profile tile sits first in the rail).
-const PIN_STOPS: Record<StageKey, number> = { build: 330, test: 600, hired: 945 };
+/** Pin stops with only the three stage tiles (profile complete). */
+const PIN_STOPS: Record<StageKey, number> = { build: 22, test: 500, hired: 945 };
 /** Start of the road, under the Complete your profile tile. */
 const PROFILE_STOP = 30;
 
@@ -336,12 +342,12 @@ function ProfileTile({ score }: { score: number }) {
       )}
       <span
         className={cn(
-          "flex size-12 shrink-0 items-center justify-center rounded-xl",
+          "flex size-16 shrink-0 items-center justify-center rounded-2xl",
           done ? "bg-[#E8F3F2] text-[#03535F]" : "bg-white text-[#E5392A] shadow-[0_4px_10px_-4px_rgba(224,58,40,0.45)]",
         )}
         aria-hidden="true"
       >
-        <UserRound className="size-7" strokeWidth={2} />
+        <UserRound className="size-10" strokeWidth={2} />
       </span>
       <span className="min-w-0 flex-1">
         <span className={cn("block text-xs font-semibold tracking-[0.14em]", done ? "text-[#03535F]" : "text-[#C62D1F]")}>

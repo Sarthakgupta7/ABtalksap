@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, BarChart3, Blocks, Bot, Code2, Network, Sparkles, Timer, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -42,71 +41,88 @@ const ICON: Record<LibraryArt, typeof Code2> = {
   cohort: Bot,
 };
 
-export function Library({ cohorts, challenges }: { cohorts: LibraryItem[]; challenges: LibraryItem[] }) {
-  const [tab, setTab] = useState<"cohorts" | "challenges">(cohorts.length > 0 ? "cohorts" : "challenges");
-  // Cohorts shows the three most relevant; challenges show in full.
-  const items = tab === "cohorts" ? cohorts.slice(0, 3) : challenges;
+/* The library holds two distinct shelves, stacked: Job Skills (cohorts)
+   and Personal Skills (challenges), each with its own "How it works". */
+const SHELVES = {
+  job: {
+    title: "Job",
+    accent: "Skills",
+    how: "Short, mentor-led cohorts built around the tools employers hire for. Each one runs for a fixed number of days: follow the modules, ship a real project on the platform, and finish with a portfolio piece recruiters can see.",
+    tone: "bg-[linear-gradient(135deg,#E3F2F2_0%,#F4FAFA_100%)] border-[#D3E8E8]",
+    ink: "text-[#03535F]",
+    dot: "bg-[#03535F]",
+  },
+  personal: {
+    title: "Personal",
+    accent: "Skills",
+    how: "Self-paced challenges that build the habit of shipping. Pick a track, complete one task a day, share proof on GitHub and LinkedIn, and grow your streak — or test yourself against the clock in a hackathon.",
+    tone: "bg-[linear-gradient(135deg,#FFF1E4_0%,#FFF9F3_100%)] border-[#F5DFC9]",
+    ink: "text-[#B25A0B]",
+    dot: "bg-[#E08A12]",
+  },
+} as const;
 
+export function Library({ cohorts, challenges }: { cohorts: LibraryItem[]; challenges: LibraryItem[] }) {
   return (
     <section id="events" className="scroll-mt-24 pt-4">
       {/* A white folder: the heading sits in its flap (top-left), which
-          slopes down into the body with a curved, angled join. The
-          Cohorts / Challenges pills sit outside the folder, on the page. */}
-      <div className="flex flex-col-reverse gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="relative min-w-0 self-start lg:self-end">
-          <div className="relative rounded-tl-[22px] bg-white px-5 pb-[17px] pt-6 sm:px-8">
-            <h3 className="font-heading text-xl font-bold leading-tight tracking-tight text-black sm:text-2xl lg:whitespace-nowrap">
-              Browse through our <span className="text-[#03535F]">Library</span> and see more{" "}
-              <span className="text-[#03535F]">suggested content</span>
-            </h3>
-            {/* Flap edge: an S-curve from the flap's top down into the body,
-                sized to the flap's own height (never sets it). */}
-            <svg
-              viewBox="0 0 64 100"
-              preserveAspectRatio="none"
-              className="absolute left-[calc(100%-1px)] top-0 h-full w-20"
-              aria-hidden="true"
-            >
-              <path d="M0 0 H4 C 26 0, 30 100, 64 100 H0 Z" fill="#FFFFFF" />
-            </svg>
-          </div>
-        </div>
-
-        <div role="tablist" aria-label="Library" className="flex shrink-0 gap-3 self-end pb-3">
-          {(["cohorts", "challenges"] as const).map((t) => {
-            const on = tab === t;
-            return (
-              <button
-                key={t}
-                type="button"
-                role="tab"
-                aria-selected={on}
-                onClick={() => setTab(t)}
-                className={cn(
-                  "h-11 min-w-[128px] rounded-full px-6 text-sm font-semibold capitalize transition-colors sm:min-w-[150px] sm:text-base",
-                  on
-                    ? "bg-[#03535F] text-white shadow-[inset_0_-4px_12px_rgba(0,0,0,0.25)]"
-                    : "border border-[#E3E7E7] bg-white text-[#6B7280] hover:text-[#03535F]",
-                )}
-              >
-                {t}
-              </button>
-            );
-          })}
+          slopes down into the body with a curved, angled join. */}
+      <div className="relative min-w-0 w-fit">
+        <div className="relative rounded-tl-[22px] bg-white px-5 pb-[17px] pt-6 sm:px-8">
+          <h3 className="font-heading text-xl font-bold leading-tight tracking-tight text-black sm:text-2xl lg:whitespace-nowrap">
+            Browse through our <span className="text-[#03535F]">Library</span> and see more{" "}
+            <span className="text-[#03535F]">suggested content</span>
+          </h3>
+          <svg
+            viewBox="0 0 64 100"
+            preserveAspectRatio="none"
+            className="absolute left-[calc(100%-1px)] top-0 h-full w-20"
+            aria-hidden="true"
+          >
+            <path d="M0 0 H4 C 26 0, 30 100, 64 100 H0 Z" fill="#FFFFFF" />
+          </svg>
         </div>
       </div>
 
-      <div className="-mt-px rounded-b-[28px] rounded-tr-[28px] bg-white px-5 pb-6 pt-5 sm:px-8 sm:pb-8">
-        {items.length === 0 ? (
-          <p className="text-sm text-[#6B7280]">Nothing here right now — check back soon.</p>
-        ) : (
-          <ul id="prep-kit" className="grid scroll-mt-24 gap-5 md:grid-cols-2 xl:grid-cols-3 xl:gap-6">
-            {items.map((it) => (
-              <FolderCard key={it.key} item={it} />
-            ))}
-          </ul>
-        )}
+      <div className="-mt-px space-y-6 rounded-b-[28px] rounded-tr-[28px] bg-white px-5 pb-6 pt-5 sm:px-8 sm:pb-8">
+        <Shelf id="prep-kit" shelf={SHELVES.job} items={cohorts.slice(0, 3)} />
+        <Shelf id="domains-library" shelf={SHELVES.personal} items={challenges} />
       </div>
+    </section>
+  );
+}
+
+function Shelf({
+  id,
+  shelf,
+  items,
+}: {
+  id: string;
+  shelf: (typeof SHELVES)[keyof typeof SHELVES];
+  items: LibraryItem[];
+}) {
+  return (
+    <section id={id} className={cn("scroll-mt-24 rounded-3xl border p-5 sm:p-7", shelf.tone)}>
+      <div className="mx-auto max-w-3xl text-center">
+        <h4 className="font-heading text-2xl font-bold tracking-tight text-black sm:text-[28px]">
+          {shelf.title} <span className={shelf.ink}>{shelf.accent}</span>
+        </h4>
+        <p className={cn("mt-4 flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.2em]", shelf.ink)}>
+          <span className={cn("size-1.5 rounded-full", shelf.dot)} aria-hidden="true" />
+          How it works
+          <span className={cn("size-1.5 rounded-full", shelf.dot)} aria-hidden="true" />
+        </p>
+        <p className="mt-2 text-base leading-relaxed text-[#1F1F1F] sm:text-lg">{shelf.how}</p>
+      </div>
+      {items.length === 0 ? (
+        <p className="mt-6 text-center text-sm text-[#6B7280]">Nothing here right now — check back soon.</p>
+      ) : (
+        <ul className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3 xl:gap-6">
+          {items.map((it) => (
+            <FolderCard key={it.key} item={it} />
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

@@ -17,7 +17,6 @@ import {
 } from "@/components/workshop/events-data";
 import { getWorkshopPrefill } from "@/features/workshop/get-prefill";
 import { getMyRegistration } from "@/features/workshop/registration-status";
-import { getWorkshopConfig } from "@/lib/workshop-supabase";
 import { listPublicEvents } from "@/repositories/workshop";
 import {
   getIntConfig,
@@ -25,6 +24,7 @@ import {
   WORKSHOP_CALENDAR_VISIBLE_KEY,
   WORKSHOP_COMING_SOON_MESSAGE_KEY,
   WORKSHOP_MODE_KEY,
+  WORKSHOP_WHATSAPP_LINK_KEY,
 } from "@/lib/platform-config";
 
 /*
@@ -54,9 +54,9 @@ export const metadata: Metadata = {
 export default async function AIWorkshopPage() {
   // This page stays PUBLIC — the marketing content, countdown and calendar must
   // render for logged-out cold traffic. Only the form overlay is gated.
-  const [config, session, events, mode, calendarVisible, comingSoonMessage] =
+  const [whatsappLink, session, events, mode, calendarVisible, comingSoonMessage] =
     await Promise.all([
-      getWorkshopConfig(),
+      getStringConfig(WORKSHOP_WHATSAPP_LINK_KEY),
       auth(),
       listPublicEvents(),
       getStringConfig(WORKSHOP_MODE_KEY),
@@ -188,7 +188,7 @@ export default async function AIWorkshopPage() {
           only across the Server→Client boundary: never the session object or
           a WorkshopEvent (it carries a LucideIcon). */}
         <RegistrationModal
-          whatsappLink={config.whatsappLink}
+          whatsappLink={whatsappLink}
           isSignedIn={Boolean(userId)}
           sessionEmail={session?.user?.email ?? null}
           sessionName={session?.user?.name ?? null}

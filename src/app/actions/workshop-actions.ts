@@ -12,7 +12,11 @@ import { prisma } from "@/lib/db";
 import { logger, safeErrorMessage } from "@/lib/logger";
 import { hashRecipient } from "@/lib/observability/notification-delivery";
 import { sendWorkshopConfirmationEmail } from "@/lib/workshop-email";
-import { getWorkshopConfig } from "@/lib/workshop-supabase";
+import {
+  getStringConfig,
+  WORKSHOP_WHATSAPP_LINK_KEY,
+  WORKSHOP_ZOOM_LINK_KEY,
+} from "@/lib/platform-config";
 import { recordLegalConsents } from "@/features/legal/record-consent";
 import { recordNewsletterOptIn } from "@/features/legal/record-newsletter-optin";
 import { applyCandidateIdentityChange } from "@/repositories/candidate-identity";
@@ -138,10 +142,16 @@ export async function submitWorkshopRegistrationAction(
   });
 
   // The row is saved at this point. A mail failure must never fail the request.
-  const config = await getWorkshopConfig();
+  // Links come from PlatformConfig; the date and time come from the event.
+  // Nothing about this email reads Supabase any more (plan 163 phase 3c).
+  const [zoomLink, whatsappLink] = await Promise.all([
+    getStringConfig(WORKSHOP_ZOOM_LINK_KEY),
+    getStringConfig(WORKSHOP_WHATSAPP_LINK_KEY),
+  ]);
   try {
     await sendWorkshopConfirmationEmail(name, email, {
-      ...config,
+      zoomLink,
+      whatsappLink,
       webinarDate: fullDate(event.date),
       webinarTime: event.time,
     });
@@ -160,5 +170,5 @@ export async function submitWorkshopRegistrationAction(
     );
   }
 
-  return { ok: true, data: { whatsappLink: config.whatsappLink } };
+  return { ok: true, data: { whatsappLink } };
 }

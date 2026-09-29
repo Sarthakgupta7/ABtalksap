@@ -50,6 +50,7 @@ export async function deleteOwnCandidateAccount(
       role: true,
       deletedAt: true,
       password: true,
+      candidateProfile: { select: { fullName: true } },
     },
   });
   if (!user) {
@@ -62,6 +63,8 @@ export async function deleteOwnCandidateAccount(
   const emailDomain = user.email.includes("@")
     ? (user.email.split("@")[1] ?? null)
     : null;
+  const displayName =
+    user.candidateProfile?.fullName?.trim() || user.name?.trim() || null;
 
   await writeAudit(tx, {
     actorUserId: userId,
@@ -81,7 +84,14 @@ export async function deleteOwnCandidateAccount(
       hadPassword: Boolean(user.password),
     },
     newState: { deleted: true },
-    metadata: { leaveReason, feedback },
+    // Product decision (2026-09-29): keep who left so admins can follow up.
+    // The user row is hard-deleted below, so this snapshot is the only
+    // record of the name and address. Pending security-owner review.
+    metadata: {
+      leaveReason,
+      feedback,
+      deletedUser: { name: displayName, email: user.email },
+    },
   });
 
   await tx.creditTransaction.updateMany({
@@ -95,5 +105,5 @@ export async function deleteOwnCandidateAccount(
 
   await tx.user.delete({ where: { id: userId } });
 
-  return { email: user.email, name: user.name };
+  return { email: user.email, name: displayName };
 }

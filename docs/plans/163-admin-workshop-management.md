@@ -2,9 +2,11 @@
 
 ## 1. Goal
 
-Let an admin run the entire workshop surface from the admin console — add and
-remove workshops, attach a poster, show or hide the calendar, and put the public
-page into a dedicated "coming soon" state — with no code change and no deploy.
+Let an admin run the entire workshop surface from the admin console — add,
+publish, update and archive workshops, attach a poster, show or hide the
+calendar, and put the public page into a dedicated "coming soon" state — with no
+code change and no deploy. ("Archive", not "remove": hard deletion is only ever
+allowed for a workshop with an empty roster — see §9.)
 The ten existing workshops are preserved as historical records with their
 rosters intact, but the public experience starts fresh.
 
@@ -118,6 +120,22 @@ model WorkshopEvent {
 `resources` (past-workshop links) is a small `{label, href, kind}[]` — a `Json`
 column is proportionate; do not build a second table.
 
+**`WorkshopTrack` is a genuinely new enum — checked.** There is no `*Track` enum
+in the schema today; `track` is currently the TS union
+`"workshop" | "hackathon" | "cohort" | "challenge"` in `events-data.ts`. Two
+existing enums carry those same four values and **neither may be reused**:
+
+- **`NotificationCategory`** (`schema.prisma:1731`) has exactly
+  `WORKSHOP | HACKATHON | COHORT | CHALLENGE`. It is a **hard-locked Prisma enum**
+  owned by Manuvrtti — CLAUDE.md names it explicitly in the notification lock.
+  Reusing it would breach the lock and couple the workshop schedule to the
+  notification domain. **Do not touch it.**
+- **`CertificateType`** (`schema.prisma:638`) is close but is about certificates
+  and spells the fourth value `CLAUDE_CHALLENGE`.
+
+So: declare a new `WorkshopTrack`, and do not "helpfully" consolidate it with
+either of the above.
+
 **Lifecycle.** Public eligibility is a single rule, and every public read uses it:
 
 ```
@@ -223,6 +241,11 @@ client component. No functions, icons or class instances cross the boundary.
   Component.** Store the name; map it on the client.
 - **Do not put posters in the résumé Blob store**, and do not make that store
   public. Résumés carry personal data.
+- **Do not reuse or modify `NotificationCategory`** for `track`, however well its
+  values match. It is a hard-locked enum in Manuvrtti's notification module.
+  Declare `WorkshopTrack` — see §5.
+- **Do not hard-delete an event to "clean up" the port.** All ten legacy rows
+  stay, archived.
 - Do not add the `WorkshopRegistration.eventId` → `WorkshopEvent.id` FK in phase 1.
 - Do not drop `events-data.ts` wholesale — the type, helpers and icon map stay;
   only the `EVENTS` array goes.

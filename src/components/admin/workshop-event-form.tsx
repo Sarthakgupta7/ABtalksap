@@ -14,8 +14,14 @@ import {
 } from "@/lib/validations/workshop";
 import {
   createWorkshopAction,
+  removeWorkshopPosterAction,
+  saveWorkshopPosterAction,
   updateWorkshopAction,
 } from "@/app/actions/admin-workshop-actions";
+import {
+  ACCEPTED_POSTER_MIME_TYPES,
+  MAX_POSTER_MB,
+} from "@/features/workshop/poster";
 
 export type WorkshopFormValues = {
   id: string | null;
@@ -38,6 +44,7 @@ export type WorkshopFormValues = {
   titleAccents: string;
   takeaways: string;
   topics: string;
+  posterUrl: string | null;
 };
 
 export const EMPTY_WORKSHOP: WorkshopFormValues = {
@@ -61,6 +68,7 @@ export const EMPTY_WORKSHOP: WorkshopFormValues = {
   titleAccents: "",
   topics: "",
   takeaways: "",
+  posterUrl: null,
 };
 
 /** One line per entry, which is how these read and edit most naturally. */
@@ -92,6 +100,26 @@ export function WorkshopEventForm({
   const [values, setValues] = useState(initial);
   const [pending, startTransition] = useTransition();
   const isEdit = initial.id !== null;
+  // Held until there is an id to attach it to. On create the workshop is saved
+  // first and the poster uploaded straight after — see `submit`.
+  const [posterFile, setPosterFile] = useState<File | null>(null);
+  const [posterUrl, setPosterUrl] = useState<string | null>(initial.posterUrl);
+
+  async function uploadPoster(eventId: string, file: File) {
+    const fd = new FormData();
+    fd.append("eventId", eventId);
+    fd.append("file", file);
+    const res = await saveWorkshopPosterAction(fd);
+    if (!res.ok) {
+      // The workshop itself is saved; only the image failed, and the admin can
+      // retry from the edit form. Saying so beats a bare error.
+      toast.error(res.message);
+      return null;
+    }
+    setPosterUrl(res.data.posterUrl);
+    setPosterFile(null);
+    return res.data.posterUrl;
+  }
 
   function set<K extends keyof WorkshopFormValues>(
     key: K,
@@ -133,6 +161,13 @@ export function WorkshopEventForm({
         toast.error(res.message);
         return;
       }
+
+      // Create-then-upload: there is no id to attach a poster to until the
+      // workshop exists. If this second call fails the workshop still saved,
+      // which the toast above already said.
+      const id = isEdit ? initial.id : (res as { data: { id: string } }).data.id;
+      if (posterFile && id) await uploadPoster(id, posterFile);
+
       toast.success(isEdit ? "Workshop saved" : "Workshop created");
       router.refresh();
       onDone();
@@ -283,6 +318,35 @@ export function WorkshopEventForm({
         </Field>
       </div>
 
+      <PosterSection
+        eventId={initial.id}
+        posterUrl={posterUrl}
+        pendingFile={posterFile}
+        disabled={pending}
+        onPick={setPosterFile}
+        onUploadNow={async (file) => {
+          if (!initial.id) return;
+          await uploadPoster(initial.id, file);
+        }}
+        onRemove={() => {
+          if (!initial.id) {
+            setPosterFile(null);
+            return;
+          }
+          startTransition(async () => {
+            const res = await removeWorkshopPosterAction({ id: initial.id });
+            if (!res.ok) {
+              toast.error(res.message);
+              return;
+            }
+            setPosterUrl(null);
+            setPosterFile(null);
+            toast.success("Poster removed. The workshop is unchanged.");
+            router.refresh();
+          });
+        }}
+      />
+
       <div className="flex items-center gap-2">
         <Button type="button" onClick={submit} disabled={pending}>
           {pending ? "Saving..." : isEdit ? "Save changes" : "Create workshop"}
@@ -346,5 +410,94 @@ function Toggle({
         ) : null}
       </span>
     </label>
+  );
+}
+
+/**
+ * The Poster section.
+ *
+ * Optional, and independent of everything else on this form. Removing a poster
+ * does not unpublish, archive or delete the workshop, and it does not put the
+ * public page into Coming Soon — a published workshop with no poster renders
+ * live with a posterless hero. The copy says so, because an admin reaching for
+ * Remove deserves to know it is not a destructive act.
+ *
+ * On a workshop that does not exist yet the file is held and uploaded straight
+ * after it is created; there is no id to attach it to before then.
+ */
+function PosterSection({
+  eventId,
+  posterUrl,
+  pendingFile,
+  disabled,
+  onPick,
+  onUploadNow,
+  onRemove,
+}: {
+  eventId: string | null;
+  posterUrl: string | null;
+  pendingFile: File | null;
+  disabled: boolean;
+  onPick: (file: File | null) => void;
+  onUploadNow: (file: File) => Promise<void>;
+  onRemove: () => void;
+}) {
+  return (
+    <section className="rounded-lg border p-4">
+      <h3 className="text-sm font-semibold">Poster</h3>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Optional. PNG, JPEG or WebP, up to {MAX_POSTER_MB} MB. A workshop
+        without a poster still goes live — removing one changes nothing else.
+      </p>
+
+      {posterUrl ? (
+        <div className="mt-3 flex flex-wrap items-center gap-4">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a Blob URL
+              on an admin screen; next/image would need the host allow-listed
+              for no benefit here. */}
+          <img
+            src={posterUrl}
+            alt="Current workshop poster"
+            className="h-28 w-auto rounded-md border object-cover"
+          />
+          <span className="text-xs text-muted-foreground">Current poster</span>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-muted-foreground">No poster yet.</p>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <input
+          type="file"
+          accept={ACCEPTED_POSTER_MIME_TYPES.join(",")}
+          disabled={disabled}
+          className="text-sm"
+          onChange={(e) => {
+            const file = e.target.files?.[0] ?? null;
+            onPick(file);
+            // With an id we can store it immediately; without one it waits for
+            // the workshop to be created.
+            if (file && eventId) void onUploadNow(file);
+          }}
+        />
+        {posterUrl ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={disabled}
+            onClick={onRemove}
+          >
+            Remove poster
+          </Button>
+        ) : null}
+      </div>
+
+      {pendingFile && !eventId ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {pendingFile.name} will be uploaded once the workshop is created.
+        </p>
+      ) : null}
+    </section>
   );
 }

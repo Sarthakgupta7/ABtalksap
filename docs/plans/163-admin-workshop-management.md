@@ -1025,3 +1025,235 @@ Publish an event dated well in the future with a distinctive time, then check
 
 Then change the event's date in the admin console and confirm all three move
 together. The regression this guards against is exactly one of them not moving.
+
+## 17. Phase 3b / 3c — posters, config, calendar, Supabase retirement
+
+Same branch, `feat/admin-workshop-management`. Folds into
+`docs/plans/163-admin-workshop-management.md` on approval.
+
+**Complete and not to be redone:** 1a `fe73cc5e`, 1b `a39c272e`, 1c `3a9e9aa2`,
+2 `b2e020d4`, 3a `d160beab`.
+
+## Context
+
+The feature works end to end except for the parts Phase 2 deliberately stopped
+before. The admin Events form has no poster control, there is no calendar
+toggle, no admin-settable workshop config, and `/workshop` still reads
+`whatsappLink` from Supabase. 3b adds all of that; 3c retires Supabase, but only
+once the replacements are proven.
+
+## The independence that shapes everything
+
+```
+                    WORKSHOP EVENT
+                         │
+        ┌────────────────┼────────────────┐
+        ↓                ↓                ↓
+     Content          Schedule          Poster
+   title/topics     date + time        posterUrl
+                         ↓
+                     Countdown
+```
+
+- A poster does not start the timer.
+- A poster does not decide Coming Soon.
+- Calendar visibility does not affect the timer.
+- The timer does not come from Supabase.
+
+**The event's date and time IS the timer.** 3a already made that true; 3b must
+not undo it. There is no "start timer" control and no countdown field — the
+target is `eventStartMs(event)`, which parses `date` + `timeLabel` against a
+fixed `+05:30`. Change either in the admin and the public countdown follows.
+
+## Phase 3b
+
+### 1. Public blob store
+
+`src/features/workshop/storage.ts` `[new]`, modelled on
+`src/features/resume/storage.ts` but **`access: "public"` and a different
+store**. Follow that file's env convention exactly — names read through
+`process.env[NAME]` and the token passed explicitly on every call, because the
+SDK's default `BLOB_*` lookup finds nothing here:
+
+```
+workshop_READ_WRITE_TOKEN
+workshop_STORE_ID
+```
+
+**Prerequisite, and it is infrastructure, not code:** that store has to be
+provisioned and the variables set. Mirror `isStorageConfigured()` so an unset
+token logs a warning and refuses the upload cleanly rather than throwing — an
+admin sees "poster storage is not configured", not a 500.
+
+Pathname `workshops/<eventId>/<sha256>.<ext>` — content-addressed and derived
+entirely from server values, so nothing a caller sends can steer it.
+
+### 2. Validation — images only, by content
+
+`src/features/workshop/poster.ts` `[new]`. Size first, then bytes, the order
+`resume/ingest.ts` uses so a huge file is rejected without inspection. Magic
+bytes, not the extension or the browser's `Content-Type`:
+
+| Format | Leading bytes |
+|---|---|
+| PNG | `89 50 4E 47 0D 0A 1A 0A` |
+| JPEG | `FF D8 FF` |
+| WebP | `52 49 46 46` … `57 45 42 50` at offset 8 |
+
+Cap at **4 MB**. Anything else is refused server-side.
+
+### 3. Poster actions — separate from lifecycle
+
+In `src/app/actions/admin-workshop-actions.ts` `[edit]`, taking `FormData`
+(binary cannot go through a JSON action):
+
+- `uploadWorkshopPosterAction` — store, then write `posterUrl`.
+- `replaceWorkshopPosterAction` — **store the new blob, write `posterUrl`, then
+  delete the old one.** In that order, so a failed upload never leaves the
+  workshop with neither; the rule `features/resume/service.ts` already follows.
+- `removeWorkshopPosterAction` — null `posterUrl`, delete the blob. **Touches
+  nothing else**: not `publishedAt`, not `archivedAt`, not the roster.
+
+Each `requireAdmin`, writes an `AdminAction`, and revalidates.
+
+**Create-then-upload.** There is no event id before the workshop exists, so on
+create the form holds the chosen file and uploads it immediately after
+`createWorkshopAction` returns the id — one button, two calls. If the second
+fails the workshop still exists without a poster, which the admin fixes by
+editing. Deliberately no temp-key staging: a temp bucket needs a sweeper, and
+the recoverable failure is cheaper than the machinery.
+
+### 4. Form — a Poster section
+
+`src/components/admin/workshop-event-form.tsx` `[edit]`, grouped as asked:
+Workshop details → Registration → Content → **Poster**. The section shows the
+current poster preview when present, Upload or Replace, and Remove; and says
+plainly that a poster is optional and that removing one leaves the workshop
+live. Never required.
+
+### 5. Config
+
+`src/lib/platform-config.ts` `[edit]` — five keys in the existing registry:
+
+| Key | Kind | Default |
+|---|---|---|
+| `workshop.mode` | string | `LIVE` |
+| `workshop.calendar_visible` | int (0/1) | `1` |
+| `workshop.zoom_link` | string | `""` |
+| `workshop.whatsapp_link` | string | the current Supabase fallback |
+| `workshop.coming_soon_message` | string | `""` |
+
+`calendar_visible` is an **int 0/1** rather than a string, because the registry
+has no boolean kind and inventing one is a bigger change than reading `=== 1`.
+
+**`writeStringConfig` must be added** — the registry has `getStringConfig` and
+`resolveStringConfig` but only `writeIntConfig`, so string keys are read-only
+today. Mirror `writeIntConfig` exactly: validate against the spec, upsert and
+`writeAudit` in one transaction, same `PLATFORM_CONFIG_UPDATE` action type. Do
+not build a second config mechanism.
+
+Expose them through the existing `src/app/actions/admin-config-actions.ts`
+`[edit]` and `src/components/admin/platform-config-panel.tsx` `[edit]` on
+`/admin/settings` — no new settings page.
+
+### 6. Mode and the calendar
+
+`src/app/workshop/page.tsx` `[edit]`:
+
+```
+eligible published upcoming event?
+        no  -> Coming Soon, whatever mode says
+        yes -> mode === "COMING_SOON" ? Coming Soon : full experience
+```
+
+The derived rule cannot be overridden into LIVE — that is what makes the phase
+1c leak structurally impossible. `workshop.calendar_visible` gates the calendar
+section **independently**, in both states. `WorkshopComingSoon` takes the
+`coming_soon_message` it already accepts.
+
+## Phase 3c — Supabase retirement, last
+
+**Local success is not the gate.** 3c is not complete because the code works on
+a dev machine: the `PlatformConfig` replacements must be verified **in the
+production environment** first, because that is where the rows and the env
+actually differ. Until then 3c stays unmerged.
+
+Only once 3b's replacements are verified **in production**:
+
+1. `whatsappLink` reads `workshop.whatsapp_link`; verify the registration modal
+   and the logged-out registration flow still work.
+2. `zoomLink` likewise, if anything public still needs it.
+3. Confirm no workshop page code reads `workshop_config` for scheduling — 3a
+   already removed the date, time and countdown.
+4. Retire `getWorkshopConfig()` and its import from `src/app/workshop/page.tsx`.
+5. **Leave the cohort-application functions in `workshop-supabase.ts` alone.**
+6. **Do not delete the `workshop_config` row** until production confirms the
+   replacements work. Code first, data last.
+
+## Guardrails (DO NOT)
+
+- Do not let poster presence decide Coming Soon, or calendar visibility affect
+  the timer, or either affect lifecycle.
+- Do not let archiving delete a poster, or removing a poster unpublish anything.
+- Do not reintroduce `webinarDate` / `webinarTime` / `webinarTargetUtc`, or any
+  Supabase value, into the schedule or countdown.
+- Do not add a countdown-start field or a "start timer" control.
+- Do not put posters in the résumé store, and do not make that store public.
+- Do not change the event id, derive it from a `Date`, or bring back `EVENTS`.
+- Do not modify `WorkshopRegistration`, add a foreign key, or touch
+  `NotificationCategory` or notification logic beyond the 1b seam.
+- Keep `/workshop` and `/workshop/events` public.
+- Do not redo 1a/1b/1c/2/3a.
+
+## Verification
+
+Run the numbered list in full; these are the ones that catch coupling:
+
+| # | Check |
+|---|---|
+| 1 | future event, **no poster** → publishes, hero renders, **not** Coming Soon |
+| 2 | upload → poster visible **logged out** |
+| 3 | replace → new poster live, old blob gone |
+| 4 | remove → **still LIVE**, hero intact, poster gone |
+| 5–6 | change date, then time → hero, calendar and countdown all follow |
+| 7–8 | calendar OFF → section gone, hero intact; ON → back, TBA tiles work and are not registerable |
+| 9 | `mode = COMING_SOON` with a published event → Coming Soon: no hero, countdown, CTA or poster |
+| 10 | `mode = LIVE` with no eligible event → **still Coming Soon** |
+| 11 | `registrationOpen = false` → not eligible → Coming Soon |
+| 12 | countdown target is the event's instant; no Supabase value participates |
+| 13 | WhatsApp / registration still works after the config move |
+| **14** | **two published upcoming events** — see below |
+
+**14. Multiple published events.** This feature has had several
+"two sources of truth" bugs, so the selection logic gets its own test rather
+than being assumed. Publish two future events on different dates:
+
+- the hero uses the **same** event `getRegistrableEvent` / `openWorkshops`
+  select — not "the first row", not "the newest";
+- the countdown matches **that** event;
+- the calendar shows **both**;
+- the registration CTA points at the selected one.
+
+Then close registration on the **earlier** one:
+
+- it stops being eligible;
+- the hero and countdown move to the **next eligible** event — the page must
+  **not** fall to Coming Soon while a later event is still open;
+- the calendar still shows both.
+
+Then archive the earlier one: the next eligible event becomes the hero event.
+
+Then `npx tsx prisma/scripts/verify-workshop-events-port.ts` — 10/10 events,
+**10/10 archived**, 366/366 registrations — plus `tsc --noEmit`, `npm run build`
+and eslint on touched files, all with `NODE_OPTIONS=--max-old-space-size=8192`.
+
+> **Re-archive `workshop-2026-09-26` before the final verification.** It is
+> currently a **draft** — its `archivedAt` was cleared during the Phase 2
+> browser pass — so the script reports 9/10. The documented end state is
+> **10/10 archived**, and a 9/10 run must not be accepted as success. It has no
+> registrations and drafts are not public, so the fix is a one-field restore,
+> not a data repair.
+
+**No PR.** Report files changed, commit hash, poster storage behaviour, the
+timer's source and timezone, config changes, remaining Supabase dependencies,
+every verification result, and anything still needing a browser.

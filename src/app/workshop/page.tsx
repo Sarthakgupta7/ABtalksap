@@ -19,6 +19,13 @@ import { getWorkshopPrefill } from "@/features/workshop/get-prefill";
 import { getMyRegistration } from "@/features/workshop/registration-status";
 import { getWorkshopConfig } from "@/lib/workshop-supabase";
 import { listPublicEvents } from "@/repositories/workshop";
+import {
+  getIntConfig,
+  getStringConfig,
+  WORKSHOP_CALENDAR_VISIBLE_KEY,
+  WORKSHOP_COMING_SOON_MESSAGE_KEY,
+  WORKSHOP_MODE_KEY,
+} from "@/lib/platform-config";
 
 /*
  * Track-neutral on purpose.
@@ -47,13 +54,37 @@ export const metadata: Metadata = {
 export default async function AIWorkshopPage() {
   // This page stays PUBLIC — the marketing content, countdown and calendar must
   // render for logged-out cold traffic. Only the form overlay is gated.
-  const [config, session, events] = await Promise.all([
-    getWorkshopConfig(),
-    auth(),
-    listPublicEvents(),
-  ]);
+  const [config, session, events, mode, calendarVisible, comingSoonMessage] =
+    await Promise.all([
+      getWorkshopConfig(),
+      auth(),
+      listPublicEvents(),
+      getStringConfig(WORKSHOP_MODE_KEY),
+      getIntConfig(WORKSHOP_CALENDAR_VISIBLE_KEY),
+      getStringConfig(WORKSHOP_COMING_SOON_MESSAGE_KEY),
+    ]);
 
+  /*
+    The single selection rule, shared with the sidebar and the registration
+    gate: the soonest open workshop. Not "the first row" and not "the newest" —
+    with two published events the hero, the countdown and the CTA must all name
+    the one this returns.
+  */
   const event = getRegistrableEvent(events);
+
+  /*
+    Mode can only force Coming Soon ON, never off.
+
+    With no eligible event the page shows Coming Soon whatever the config says,
+    which is what makes the phase 1c leak structurally impossible: an admin
+    cannot set the page LIVE and have it invent a workshop. The admin override
+    exists for the other direction — going dark early, or during a break.
+
+    Deliberately not an input here: the poster. A published workshop with no
+    poster is LIVE with a posterless hero.
+  */
+  const showComingSoon = !event || mode === "COMING_SOON";
+  const showCalendar = calendarVisible === 1;
   const userId = session?.user?.id ?? null;
 
   const [alreadyRegistered, prefill] = userId
@@ -99,7 +130,7 @@ export default async function AIWorkshopPage() {
           workshop. Passing primitives keeps that true and keeps the event's
           fields off the Server→Client boundary.
         */}
-        {event ? (
+        {!showComingSoon && event ? (
           <>
             {/*
               Date, time and countdown come from the EVENT, not the Supabase
@@ -131,14 +162,22 @@ export default async function AIWorkshopPage() {
             <CommunityStats />
           </>
         ) : (
-          <WorkshopComingSoon />
+          <WorkshopComingSoon message={comingSoonMessage} />
         )}
 
         {/* `scroll-mt-16` clears the 54px sticky header so the calendar's
           heading is not hidden under it when "Discover events" jumps here. */}
-        <div id="events" className="scroll-mt-16">
-          <EventsCalendar events={events} />
-        </div>
+        {/*
+          Independent of both the mode and the poster: the calendar shows in
+          the Coming Soon state too, because the cadence carries on even when
+          the next topic is not announced, and `placeholderSaturdays` fills it
+          with TBA tiles.
+        */}
+        {showCalendar ? (
+          <div id="events" className="scroll-mt-16">
+            <EventsCalendar events={events} />
+          </div>
+        ) : null}
 
         {/* The same footer /marketplace and /dashboard render, rather than the
           charcoal --wk-bar-* one this page used to carry, so the bottom of the
@@ -153,7 +192,9 @@ export default async function AIWorkshopPage() {
           isSignedIn={Boolean(userId)}
           sessionEmail={session?.user?.email ?? null}
           sessionName={session?.user?.name ?? null}
-          registrationOpen={Boolean(event)}
+          // Coming Soon closes the form too: an admin who takes the page down
+          // must not leave a reachable signup behind it.
+          registrationOpen={!showComingSoon && Boolean(event)}
           alreadyRegistered={alreadyRegistered}
           prefillName={prefill?.name ?? null}
           prefillPhone={prefill?.phone ?? null}

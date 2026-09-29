@@ -15,10 +15,21 @@ import {
   type WorkshopEventInput,
 } from "@/lib/validations/workshop";
 import {
+  deletePosterFile,
+  isPosterStorageConfigured,
+  storePosterFile,
+} from "@/features/workshop/storage";
+import {
+  MAX_POSTER_BYTES,
+  MAX_POSTER_MB,
+  validatePosterBytes,
+} from "@/features/workshop/poster";
+import {
   createEvent,
   deleteEventIfEmpty,
   getEventForAdmin,
   setLifecycle,
+  setPosterUrl,
   updateEvent,
   type WorkshopWriteFields,
 } from "@/repositories/workshop";
@@ -290,4 +301,151 @@ export async function deleteWorkshopAction(raw: unknown): Promise<Result> {
 
   revalidateWorkshopViews();
   return { ok: true };
+}
+
+/* ── Poster (plan 163 phase 3b) ──────────────────────────────────────────── */
+
+/**
+ * The poster is its own axis.
+ *
+ * None of these three touch `publishedAt`, `archivedAt` or the roster, and
+ * nothing about the poster feeds the public mode: a published workshop with no
+ * poster renders LIVE with a posterless hero. "No poster" is not "Coming
+ * Soon", and removing one must never take a workshop off the site.
+ */
+
+async function readPoster(formData: FormData): Promise<
+  | { ok: true; eventId: string; bytes: Uint8Array; mimeType: string }
+  | { ok: false; message: string }
+> {
+  const id = workshopIdSchema.safeParse({ id: formData.get("eventId") });
+  if (!id.success) return { ok: false, message: "Unknown workshop." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, message: "Choose an image." };
+  }
+  // Cheap pre-check so an oversized file is refused before it is buffered;
+  // `validatePosterBytes` is the authority and re-checks the actual bytes.
+  if (file.size > MAX_POSTER_BYTES) {
+    return {
+      ok: false,
+      message: `That image is too large. Use a PNG, JPEG or WebP under ${MAX_POSTER_MB} MB.`,
+    };
+  }
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const valid = validatePosterBytes(bytes);
+  if (!valid.ok) return { ok: false, message: valid.message };
+
+  return { ok: true, eventId: id.data.id, bytes, mimeType: valid.mimeType };
+}
+
+/**
+ * Upload or replace — one path, because replacing is uploading plus a cleanup.
+ *
+ * The new blob is stored and `posterUrl` written BEFORE the old blob is
+ * deleted, so a failed upload never leaves the workshop with neither. Same
+ * ordering rule as `features/resume/service.ts`.
+ */
+export async function saveWorkshopPosterAction(
+  formData: FormData,
+): Promise<Result<{ posterUrl: string }>> {
+  const admin = await requireAdmin();
+  const input = await readPoster(formData);
+  if (!input.ok) return { ok: false, message: input.message };
+
+  if (!isPosterStorageConfigured()) {
+    return {
+      ok: false,
+      message:
+        "Poster storage is not configured on this environment. The workshop itself is saved.",
+    };
+  }
+
+  const before = await getEventForAdmin(input.eventId);
+  if (!before) return { ok: false, message: "That workshop no longer exists." };
+
+  try {
+    const posterUrl = await storePosterFile({
+      eventId: input.eventId,
+      bytes: input.bytes,
+      mimeType: input.mimeType,
+    });
+    if (!posterUrl) {
+      return { ok: false, message: "Could not store that image. Try again." };
+    }
+
+    await setPosterUrl(input.eventId, posterUrl);
+
+    // Only now, and only if it actually changed. A same-content re-upload
+    // hashes to the same pathname, so deleting here would remove the file we
+    // just wrote.
+    if (before.posterUrl && before.posterUrl !== posterUrl) {
+      await deletePosterFile(before.posterUrl);
+    }
+
+    await writeClient().$transaction(async (tx) => {
+      await writeAudit(tx, {
+        actorUserId: admin.userId,
+        adminUserId: admin.userId,
+        entityType: "WorkshopEvent",
+        entityId: input.eventId,
+        actionType: before.posterUrl ? "WORKSHOP_POSTER_REPLACE" : "WORKSHOP_POSTER_UPLOAD",
+        reason: `Poster ${before.posterUrl ? "replaced" : "uploaded"} for "${before.title}".`,
+        previousState: { posterUrl: before.posterUrl },
+        newState: { posterUrl },
+      });
+    });
+
+    revalidateWorkshopViews();
+    return { ok: true, data: { posterUrl } };
+  } catch (error) {
+    logger.error("[admin] saveWorkshopPosterAction", { error: String(error) });
+    return { ok: false, message: "Could not store that image. Try again." };
+  }
+}
+
+/**
+ * Remove the poster and nothing else.
+ *
+ * `posterUrl` is nulled first, then the blob deleted — that order means a
+ * failed delete orphans a file rather than leaving the page pointing at one
+ * that is gone. The lifecycle is untouched: the workshop stays exactly as
+ * published or archived as it was.
+ */
+export async function removeWorkshopPosterAction(
+  raw: unknown,
+): Promise<Result> {
+  const admin = await requireAdmin();
+  const parsed = workshopIdSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, message: "Unknown workshop." };
+
+  const before = await getEventForAdmin(parsed.data.id);
+  if (!before) return { ok: false, message: "That workshop no longer exists." };
+  if (!before.posterUrl) return { ok: true };
+
+  try {
+    await setPosterUrl(parsed.data.id, null);
+    await deletePosterFile(before.posterUrl);
+
+    await writeClient().$transaction(async (tx) => {
+      await writeAudit(tx, {
+        actorUserId: admin.userId,
+        adminUserId: admin.userId,
+        entityType: "WorkshopEvent",
+        entityId: parsed.data.id,
+        actionType: "WORKSHOP_POSTER_REMOVE",
+        reason: `Poster removed from "${before.title}". The workshop itself is unchanged.`,
+        previousState: { posterUrl: before.posterUrl },
+        newState: { posterUrl: null },
+      });
+    });
+
+    revalidateWorkshopViews();
+    return { ok: true };
+  } catch (error) {
+    logger.error("[admin] removeWorkshopPosterAction", { error: String(error) });
+    return { ok: false, message: "Could not remove that poster." };
+  }
 }

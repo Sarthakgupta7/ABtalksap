@@ -280,3 +280,18 @@ export async function deleteEventIfEmpty(
     return { ok: true } as const;
   });
 }
+
+/**
+ * The poster, and only the poster.
+ *
+ * Deliberately its own function rather than a field on `updateEvent`: the
+ * poster is independent of the workshop's content and of its lifecycle, and a
+ * write that could touch both invites the coupling plan 163 exists to prevent.
+ */
+export async function setPosterUrl(id: string, posterUrl: string | null) {
+  return prisma.workshopEvent.update({
+    where: { id },
+    data: { posterUrl },
+    select: { id: true, posterUrl: true },
+  });
+}

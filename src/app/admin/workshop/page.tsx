@@ -130,6 +130,7 @@ async function EventsTab() {
       titleAccents: full.titleAccents.join("\n"),
       takeaways: full.takeaways.join("\n"),
       topics: full.topics.join("\n"),
+      posterUrl: full.posterUrl,
     };
   }
 

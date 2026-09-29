@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteOwnAccountAction } from "@/app/actions/candidate-account-actions";
+import { signOutAction } from "@/app/actions/auth-actions";
 import {
   DELETE_ACCOUNT_FEEDBACK_MAX,
   DELETE_ACCOUNT_REASONS,
@@ -39,12 +40,14 @@ export function DeleteOwnAccountDialog() {
       reason,
       feedback: feedback.trim() || undefined,
     });
-    setPending(false);
     if (!result.ok) {
+      setPending(false);
       toast.error(result.message);
       return;
     }
-    window.location.assign("/api/auth/signout?callbackUrl=/");
+    // Server-side signOut clears the cookie and redirects to "/" directly;
+    // the GET /api/auth/signout route would show Auth.js's confirm page.
+    await signOutAction();
   }
 
   return (

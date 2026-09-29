@@ -125,6 +125,18 @@ export const EVENT_TYPE_REGISTRY: Record<string, EventTypeConfig> = {
     emailExempt: false,
     defaultEmailEnabled: true,
   },
+  // A recruiter moved this candidate to Shortlisted, Offer or Hired on
+  // /hire/pipeline — sent to every candidate on the board, not only
+  // applicants. Sent from pipeline-convergence/sync-application-status.ts.
+  // Candidates can turn the email off in settings; in-app always lands.
+  "pipeline.stage_reached": {
+    key: "pipeline.stage_reached",
+    label: "A recruiter moved you forward",
+    priority: "important",
+    suppressionExempt: true,
+    emailExempt: false,
+    defaultEmailEnabled: true,
+  },
   // An admin changed something on this person's account from the
   // "Perform admin action" menu (reset, ready-for-interview, synergy grant,
   // restore, sign-out-everywhere, …). A service message about their own

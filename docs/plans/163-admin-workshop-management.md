@@ -198,34 +198,60 @@ client component. No functions, icons or class instances cross the boundary.
 ## 8. Steps
 
 ### Phase 1
+
+**Scope fence.** Phase 1 is items 1–6 below and nothing else. It must not touch
+admin CRUD, poster upload, Blob infrastructure, the `PlatformConfig` migration,
+the coming-soon design, or the calendar toggle. Those are phases 2 and 3. A
+Phase 1 diff containing `admin-workshop-actions.ts`, `features/workshop/storage.ts`
+or `WorkshopComingSoon.tsx` has drifted.
+
 1. Model + additive migration. Nothing existing is altered or dropped.
 2. Seed script ports all 10 events, **ids verbatim**, and sets `archivedAt` on
    each. Idempotent (`upsert` by id) so it can be re-run. It prints every id.
-3. **Gate before phase 2:** assert every distinct `WorkshopRegistration.eventId`
+
+   **Derive the rows from the live array; do not retype them.** The script
+   `import { EVENTS } from "@/components/workshop/events-data"` and maps over it.
+   Hand-copying ten objects is where date, `resources`, `externalHref`,
+   `ctaLabel` and `registrationOpen` bugs get in, and they are invisible until a
+   past workshop renders wrong months later.
+
+   One field needs real care: **`Icon` is a component, and we are storing a
+   name.** Derive it as `event.Icon.displayName ?? event.Icon.name` — lucide
+   sets `displayName` — and **assert every one resolved to a non-empty string
+   that exists in the icon map** before writing. A silently empty `iconName`
+   renders a blank card.
+
+3. **Compare before retiring the array.** With the seed applied and `EVENTS`
+   still present, run a check that every event in the array has a `WorkshopEvent`
+   row whose `id`, `date`, `title`, `timeLabel`, `host`, `location`, `tag`,
+   `accent`, `track`, `iconName`, `externalHref`, `ctaLabel`, `registrationOpen`
+   and `resources` match. Only delete the `EVENTS` array once that passes —
+   after deletion the comparison is impossible.
+4. **Gate before phase 2:** assert every distinct `WorkshopRegistration.eventId`
    matches a `WorkshopEvent.id`. If even one does not, stop — a roster is about
    to detach.
-4. Swap the three read sites to the repository, applying the eligibility rule
+5. Swap the three read sites to the repository, applying the eligibility rule
    from §5. With every legacy event archived, the public upcoming surfaces are
    legitimately empty and must render the TBA / coming-soon state.
-5. Rewrite `getRegistrableEvent` to the §5 rule. Keep its existing
+6. Rewrite `getRegistrableEvent` to the §5 rule. Keep its existing
    "soonest single open event" behaviour — that is what stops two open workshops
    filing both rosters under the earlier one.
 
 ### Phase 2
-6. Actions: `requireAdmin` + Zod + `{ ok, data } | { ok, message }`, each
+7. Actions: `requireAdmin` + Zod + `{ ok, data } | { ok, message }`, each
    writing an `AdminAction` audit row via `writeAudit`.
-7. The id is **derived from the date and shown read-only**. Never an input.
-8. **Archive, never delete**, for any event with registrations. Deletion only
+8. The id is **derived from the date and shown read-only**. Never an input.
+9. **Archive, never delete**, for any event with registrations. Deletion only
    when the roster is empty, and the UI must say which case it is in.
-9. Mirror existing admin form patterns; `AccountOpsDialog`'s reason-plus-confirm
+10. Mirror existing admin form patterns; `AccountOpsDialog`'s reason-plus-confirm
    is the house style for consequential admin writes.
 
 ### Phase 3
-10. Register the config keys; expose them in the admin settings panel.
-11. Poster upload validates **magic bytes server-side**, not just the extension —
+11. Register the config keys; expose them in the admin settings panel.
+12. Poster upload validates **magic bytes server-side**, not just the extension —
     `src/features/resume/ingest.ts` does exactly this for PDFs and is the pattern
     to copy. Cap the size. Store the returned URL on the event.
-12. Retire `getWorkshopConfig()` and the Supabase import once the keys move.
+13. Retire `getWorkshopConfig()` and the Supabase import once the keys move.
     Leave the cohort-application readers in `workshop-supabase.ts` alone.
 
 ## 9. Guardrails (DO NOT)

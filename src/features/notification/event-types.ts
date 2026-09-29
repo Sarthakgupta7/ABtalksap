@@ -125,6 +125,19 @@ export const EVENT_TYPE_REGISTRY: Record<string, EventTypeConfig> = {
     emailExempt: false,
     defaultEmailEnabled: true,
   },
+  // An admin changed something on this person's account from the
+  // "Perform admin action" menu (reset, ready-for-interview, synergy grant,
+  // restore, sign-out-everywhere, …). A service message about their own
+  // account, so it always emails, like auth.password_reset.
+  // Sent from features/notification/admin-action-notify.ts.
+  "account.admin_update": {
+    key: "account.admin_update",
+    label: "Account update from ABTalks",
+    priority: "important",
+    suppressionExempt: true,
+    emailExempt: true,
+    defaultEmailEnabled: true,
+  },
 };
 
 export const EVENT_TYPES = Object.keys(EVENT_TYPE_REGISTRY);

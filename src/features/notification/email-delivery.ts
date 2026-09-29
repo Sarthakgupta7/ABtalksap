@@ -4,6 +4,20 @@ import { sendEmail } from "@/lib/email";
 import { logger } from "@/lib/logger";
 import { renderTemplate } from "./template-renderer";
 
+/**
+ * High-priority headers for account service notices (`account.admin_update`
+ * and the direct disable/delete mails in admin-action-notify.ts). Gmail
+ * picks the tab and the Important marker itself; these, plus no
+ * `Precedence: bulk` and plain service-message copy, are the signals a
+ * sender can give. Account notices only — overusing them on routine mail
+ * is a spam signal.
+ */
+export const ACCOUNT_NOTICE_HEADERS: Record<string, string> = {
+  Importance: "high",
+  "X-Priority": "1",
+  Priority: "urgent",
+};
+
 const MAX_ATTEMPTS = 5;
 const FAILURE_REASON_MAX_LENGTH = 1000;
 const SENDING_TIMEOUT_MS = 10 * 60 * 1000;
@@ -74,6 +88,10 @@ export async function processEmailDelivery(
     // keeps it out of Gmail's Promotions tab.
     bulk: false,
     kind: notification.eventType,
+    // Account service notices get the high-priority headers (only these).
+    ...(notification.eventType === "account.admin_update"
+      ? { headers: ACCOUNT_NOTICE_HEADERS }
+      : {}),
   });
 
   if (result.ok) {

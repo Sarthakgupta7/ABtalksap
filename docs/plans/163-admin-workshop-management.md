@@ -189,6 +189,17 @@ eligible = publishedAt != null
 Legacy registrations keep working against their original `eventId` strings
 regardless — the roster lookup is by id and does not consult this rule.
 
+**Archived means invisible on every public surface, and the consequence was
+weighed.** Measured before 1b: the upcoming surfaces are *already* empty today
+(all ten events are past, so `upcomingEvents`, `sidebarEvents` and
+`getRegistrableEvent` already return nothing). So this decision governs the
+archive alone. Going dark takes with it **2 published YouTube replays**
+(`ai-workshop-live`, `linkedin-ai-interview`), **5 events carrying takeaways /
+topics / resources**, and every calendar tile from June–September. Confirmed and
+accepted: the public experience starts genuinely fresh. The content is not lost
+— every row and roster stays in the database and in the admin console, and a
+future phase could re-publish any of it.
+
 **No foreign key** from `WorkshopRegistration.eventId` to `WorkshopEvent.id` in
 phase 1. Adding one is a constraint against 366 existing rows and would fail on
 any mismatch. Verify the match first; consider the FK later as its own step.
@@ -384,6 +395,16 @@ rationalise — the seam is a data-source swap and nothing else.
 - `buttonVariants` on `<Link>`, never `<Button asChild>`.
 
 ## 10. DB safety
+
+> **Recorded exception — phase 1a, 2026-09-29.** The Neon branch snapshot this
+> section requires was **not taken**: the executor had no Neon API access. 1a ran
+> without it. The exposure was limited — the migration is additive (one new
+> table, `WorkshopRegistration` untouched, no FK) and the seed is upsert-only
+> with no deletes and no writes to any existing table — and the post-run
+> verification confirmed 366/366 registrations intact. Recording this as an
+> exception rather than implying the checkpoint happened. **Take the snapshot
+> before any future phase that mutates existing rows.**
+
 
 Phase 1 changes data. Before the seed: commit checkpoint, record the hash, take a
 **Neon branch snapshot**. The migration is additive (one new table; nothing on

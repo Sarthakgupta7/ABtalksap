@@ -77,8 +77,24 @@ async function main() {
   });
   const byId = new Map(rows.map((r) => [r.id, r]));
 
-  console.log(`1. Row count: ${rows.length} (expect ${EVENTS.length})`);
-  if (rows.length !== EVENTS.length) failures++;
+  /*
+   * Scoped to the TEN PORTED EVENTS, not the whole table.
+   *
+   * It used to assert `rows.length === 10`, `archived === rows.length` and
+   * `published === 0`, which was right in phase 1a when the table held nothing
+   * but the port. Admins create and publish workshops now — that is the point
+   * of the feature — so a table with more rows, some of them published, is
+   * correct and this script must not call it a failure. What it guards is
+   * unchanged: the ten legacy events are all still here, still archived, still
+   * unpublished, and still attached to their rosters.
+   */
+  const seeded = new Set(EVENTS.map((e) => e.id));
+  const legacy = rows.filter((r) => seeded.has(r.id));
+  console.log(
+    `1. Legacy events: ${legacy.length}/${EVENTS.length} present ` +
+      `(table holds ${rows.length} in total, extras are admin-created)`,
+  );
+  if (legacy.length !== EVENTS.length) failures++;
 
   console.log("\n2. Field-by-field round trip:");
   for (const e of EVENTS) {
@@ -128,14 +144,16 @@ async function main() {
       `${rows.length} names checked against iconFor's map`,
   );
 
-  console.log("\n4. Historical, not public:");
-  const archived = rows.filter((r) => r.archivedAt !== null).length;
-  const published = rows.filter((r) => r.publishedAt !== null).length;
-  console.log(`  ${archived === rows.length ? "PASS" : "FAIL"}  archived ${archived}/${rows.length}`);
+  console.log("\n4. The legacy ten are historical, not public:");
+  const archived = legacy.filter((r) => r.archivedAt !== null).length;
+  const published = legacy.filter((r) => r.publishedAt !== null).length;
+  console.log(`  ${archived === legacy.length ? "PASS" : "FAIL"}  archived ${archived}/${legacy.length}`);
   console.log(`  ${published === 0 ? "PASS" : "FAIL"}  published ${published} (expect 0)`);
-  if (archived !== rows.length || published !== 0) failures++;
+  if (archived !== legacy.length || published !== 0) failures++;
 
   console.log("\n5. Registration integrity (the roster gate):");
+  // Every eventId must resolve to SOME row — legacy or admin-created. A new
+  // workshop with signups is as much a roster as a ported one.
   const grouped = await prisma.workshopRegistration.groupBy({
     by: ["eventId"],
     _count: { _all: true },

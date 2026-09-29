@@ -6,7 +6,7 @@ import { writeAudit } from "@/features/admin/audit";
 import { questionCreateNested } from "@/features/recruiter-assessments/prisma-store";
 import type { AssessmentQuestionRow } from "@/features/recruiter-assessments/service";
 import { cohortSlugForDomain } from "@/repositories/ids";
-import { EVENTS } from "@/components/workshop/events-data";
+import { listAllEvents } from "@/repositories/workshop";
 import {
   DOMAIN_LABELS,
   type AudienceOptions,
@@ -388,7 +388,7 @@ export function prismaPlatformStore(): PlatformStore {
     },
 
     async audienceOptions(): Promise<AudienceOptions> {
-      const [allCount, byCohort, byWorkshop] = await Promise.all([
+      const [allCount, byCohort, byWorkshop, events] = await Promise.all([
         prisma.candidateProfile.count({ where: { user: LIVE_USER } }),
         // (userId, cohortId) is unique, so a count is a count of people.
         Promise.all(
@@ -413,9 +413,12 @@ export function prismaPlatformStore(): PlatformStore {
           where: { user: LIVE_USER },
           _count: { _all: true },
         }),
+        // Plan 163: the schedule is in the database. All events, archived
+        // included — registrations point at past (archived) workshops too.
+        listAllEvents(),
       ]);
 
-      const eventsById = new Map(EVENTS.map((e) => [e.id, e]));
+      const eventsById = new Map(events.map((e) => [e.id, e]));
       const workshops = byWorkshop
         .map((w) => {
           const event = eventsById.get(w.eventId);

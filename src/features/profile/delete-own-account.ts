@@ -14,9 +14,9 @@ export class DeleteOwnAccountError extends Error {
 
 export async function deleteOwnCandidateAccount(
   tx: Tx,
-  input: { userId: string },
-): Promise<void> {
-  const { userId } = input;
+  input: { userId: string; leaveReason: string; feedback: string | null },
+): Promise<{ email: string; name: string | null }> {
+  const { userId, leaveReason, feedback } = input;
 
   const adminRow = await tx.userRoleAssignment.findFirst({
     where: {
@@ -46,6 +46,7 @@ export async function deleteOwnCandidateAccount(
     select: {
       id: true,
       email: true,
+      name: true,
       role: true,
       deletedAt: true,
       password: true,
@@ -69,13 +70,18 @@ export async function deleteOwnCandidateAccount(
     entityType: "User",
     entityId: userId,
     actionType: "ACCOUNT_SELF_DELETE",
-    reason: "Candidate requested account deletion",
+    // Reason + feedback go in `reason` so they show (and are searchable) on
+    // /admin/actions; `metadata` keeps them structured.
+    reason: feedback
+      ? `Candidate requested account deletion. Reason: ${leaveReason}. Feedback: "${feedback}"`
+      : `Candidate requested account deletion. Reason: ${leaveReason}.`,
     previousState: {
       emailDomain,
       role: user.role,
       hadPassword: Boolean(user.password),
     },
     newState: { deleted: true },
+    metadata: { leaveReason, feedback },
   });
 
   await tx.creditTransaction.updateMany({
@@ -88,4 +94,6 @@ export async function deleteOwnCandidateAccount(
   });
 
   await tx.user.delete({ where: { id: userId } });
+
+  return { email: user.email, name: user.name };
 }

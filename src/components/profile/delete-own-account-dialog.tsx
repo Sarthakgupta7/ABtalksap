@@ -14,17 +14,31 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
 import { deleteOwnAccountAction } from "@/app/actions/candidate-account-actions";
+import {
+  DELETE_ACCOUNT_FEEDBACK_MAX,
+  DELETE_ACCOUNT_REASONS,
+  type DeleteAccountReason,
+} from "@/features/profile/delete-account-reasons";
 
 export function DeleteOwnAccountDialog() {
   const [open, setOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
+  const [reason, setReason] = useState<DeleteAccountReason | "">("");
+  const [feedback, setFeedback] = useState("");
   const [pending, setPending] = useState(false);
-  const canDelete = confirmText === "DELETE";
+  const canDelete = confirmText === "DELETE" && reason !== "";
 
   async function onConfirm() {
+    if (reason === "") return;
     setPending(true);
-    const result = await deleteOwnAccountAction({ confirm: confirmText });
+    const result = await deleteOwnAccountAction({
+      confirm: confirmText,
+      reason,
+      feedback: feedback.trim() || undefined,
+    });
     setPending(false);
     if (!result.ok) {
       toast.error(result.message);
@@ -39,7 +53,11 @@ export function DeleteOwnAccountDialog() {
       onOpenChange={(next) => {
         if (pending) return;
         setOpen(next);
-        if (!next) setConfirmText("");
+        if (!next) {
+          setConfirmText("");
+          setReason("");
+          setFeedback("");
+        }
       }}
     >
       <DialogTrigger
@@ -49,7 +67,7 @@ export function DeleteOwnAccountDialog() {
           </Button>
         }
       />
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Delete my account</DialogTitle>
           <DialogDescription>
@@ -57,6 +75,38 @@ export function DeleteOwnAccountDialog() {
             to confirm.
           </DialogDescription>
         </DialogHeader>
+        <div className="space-y-2">
+          <Label id="delete-own-reason-label">Why are you leaving us?</Label>
+          <RadioGroup
+            aria-labelledby="delete-own-reason-label"
+            value={reason}
+            onValueChange={(value) => setReason(value as DeleteAccountReason)}
+          >
+            {DELETE_ACCOUNT_REASONS.map((option) => (
+              <Label
+                key={option}
+                className="flex cursor-pointer items-center gap-2 font-normal"
+              >
+                <RadioGroupItem value={option} />
+                {option}
+              </Label>
+            ))}
+          </RadioGroup>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="delete-own-feedback">
+            Anything else you want to tell us?{" "}
+            <span className="font-normal text-muted-foreground">(optional)</span>
+          </Label>
+          <Textarea
+            id="delete-own-feedback"
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            maxLength={DELETE_ACCOUNT_FEEDBACK_MAX}
+            rows={3}
+            placeholder="Your feedback helps us improve ABTalks"
+          />
+        </div>
         <div className="space-y-2">
           <Label htmlFor="delete-own-confirm">Type DELETE</Label>
           <Input

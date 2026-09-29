@@ -2,7 +2,7 @@
  * Dev-only demo fixture for T-229 and T-230 browser validation.
  *
  * Sets up an approved recruiter with a completed T-226 workspace and the
- * T-228 $200 starting balance using the real `provisionRecruiterIdentity`
+ * $20,000 starting balance using the real `provisionRecruiterIdentity`
  * application helper. Also ensures `strong@hire.abtalks.dev` has
  * `CandidateVisibility` (searchable by recruiters) and a phone number on
  * `CandidateProfile` so the real $10 unlock and contact reveal can be demoed.
@@ -111,7 +111,7 @@ async function main() {
     `  ✓ Recruiter profile: approved=${profile.approved}, setupCompletedAt=${profile.setupCompletedAt?.toISOString()}`,
   );
 
-  // 3. Workspace Provisioning + T-228 Onboarding Credit ($200)
+  // 3. Workspace Provisioning + onboarding credit ($20,000)
   // Calls the canonical application helper in an interactive transaction.
   const { provisionRecruiterIdentity } = await import(
     "../src/features/hire/provision-recruiter"

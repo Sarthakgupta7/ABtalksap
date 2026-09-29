@@ -963,3 +963,65 @@ database-driven state, and only the logged-out pass proves that:
 | archive | Coming Soon, and it stays listed in admin |
 
 **Do not raise the PR at the end of Phase 2.** That browser pass comes first.
+
+## 16. Phase 3a — the hero's date, time and countdown come from the event
+
+### The bug, found in the Phase 2 browser pass
+
+A workshop published for **2026-09-30** renders correctly in the upcoming card
+and the calendar, but the hero's date badge still reads **12 September 2026**.
+
+`src/app/workshop/page.tsx` passes the hero three values from the **Supabase**
+`workshop_config` row, not from the event:
+
+```tsx
+webinarDate={config.webinarDate}         // "September 12, 2026"
+webinarTime={config.webinarTime}
+webinarTargetUtc={config.webinarTargetUtc}   // drives CountdownTimer
+```
+
+So the page has two sources of truth for "when is the workshop", and they
+disagree. The hero is the largest thing on the page, so the wrong one is the
+one visitors read. It is the same class of defect as phase 1c's hardcoded
+title — content about a workshop that does not come from the workshop.
+
+### The fix
+
+**The event is the single source of truth for workshop identity, date, time,
+title, description, topics, registration state and countdown.** All three hero
+values derive from the eligible published event, and no new date logic is
+needed — `events-data.ts` already has the pieces:
+
+| Hero prop | Derived from |
+|---|---|
+| `webinarDate` | `fullDate(event.date)` — "30 Sep 2026" |
+| `webinarTime` | `event.time` (the event's `timeLabel`) |
+| `webinarTargetUtc` | `new Date(eventStartMs(event)).toISOString()` |
+
+`eventStartMs` already parses `date` + `time` against a fixed `+05:30`, because
+IST observes no daylight saving. It is what `openWorkshops` and `eventStatus`
+already use, so the hero, the sidebar and the registration gate finally agree
+on one instant instead of three.
+
+Files: `src/app/workshop/page.tsx` `[edit]`. The hero component itself does not
+change — it already takes these as props.
+
+### Supabase retirement — ordering
+
+After 3a, `getWorkshopConfig()` still supplies `whatsappLink` (the registration
+modal) and `zoomLink`. **Do not delete the `workshop_config` row or the reader
+until those two have `PlatformConfig` replacements written and verified in
+production.** Retiring the config is the last step of phase 3, not the first —
+a missing WhatsApp link is a broken registration flow.
+
+### Verification
+
+Publish an event dated well in the future with a distinctive time, then check
+`/workshop` **logged out**:
+- the hero date badge matches the event's date, not the Supabase one;
+- the countdown counts to that event's start instant, and is not frozen at
+  00:00:00:00;
+- the upcoming card, the calendar tile and the hero all name the same date.
+
+Then change the event's date in the admin console and confirm all three move
+together. The regression this guards against is exactly one of them not moving.

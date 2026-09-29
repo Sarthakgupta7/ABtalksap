@@ -10,7 +10,11 @@ import EventsCalendar from "@/components/workshop/EventsCalendar";
 import WorkshopThemeStyles from "@/components/workshop/WorkshopThemeStyles";
 import { WorkshopShell } from "@/components/workshop/WorkshopShell";
 import { auth } from "@/auth";
-import { getRegistrableEvent } from "@/components/workshop/events-data";
+import {
+  eventStartMs,
+  fullDate,
+  getRegistrableEvent,
+} from "@/components/workshop/events-data";
 import { getWorkshopPrefill } from "@/features/workshop/get-prefill";
 import { getMyRegistration } from "@/features/workshop/registration-status";
 import { getWorkshopConfig } from "@/lib/workshop-supabase";
@@ -97,10 +101,23 @@ export default async function AIWorkshopPage() {
         */}
         {event ? (
           <>
+            {/*
+              Date, time and countdown come from the EVENT, not the Supabase
+              config row. They used to come from `config`, so a workshop
+              published for the 30th showed the config's 12th in the hero
+              while the card and the calendar showed the 30th — two sources of
+              truth for "when is the workshop", disagreeing on the largest
+              thing on the page.
+
+              `eventStartMs` parses date + time against a fixed +05:30 (IST has
+              no daylight saving) and is what `openWorkshops` and `eventStatus`
+              already use, so the hero, the sidebar and the registration gate
+              now agree on one instant.
+            */}
             <WorkshopHero
-              webinarDate={config.webinarDate}
-              webinarTime={config.webinarTime}
-              webinarTargetUtc={config.webinarTargetUtc}
+              webinarDate={fullDate(event.date)}
+              webinarTime={event.time}
+              webinarTargetUtc={new Date(eventStartMs(event)).toISOString()}
               eventTitle={event.title}
               eventAccents={event.titleAccents ?? []}
               eventDesc={event.desc}

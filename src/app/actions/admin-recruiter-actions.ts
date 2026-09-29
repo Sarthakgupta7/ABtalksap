@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
+import { sendRecruiterWelcomeEmail } from "@/features/notification/recruiter-welcome-email";
 import { prisma, writeClient } from "@/lib/db";
 import { logger, safeErrorMessage } from "@/lib/logger";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -29,10 +31,13 @@ type ActionResult<T> = { ok: true; data: T } | { ok: false; message: string };
 /**
  * What the admin is shown once, and only once.
  *
- * `password` is the single place the plaintext exists after this call returns.
- * It is not logged, not persisted, not written to the audit row and not
- * emailed — the admin is the delivery channel by design, because putting a live
- * credential in a mailbox is the practice the one-time panel exists to avoid.
+ * `password` is not logged, not persisted and not written to the audit row.
+ * It IS emailed once to the new recruiter in the welcome mail
+ * (features/notification/recruiter-welcome-email.ts), alongside a prompt to
+ * change it after the first sign-in — a product decision that deliberately
+ * reverses the earlier "admin is the only delivery channel" design, pending
+ * security-owner review. The mail redacts the password from any error it
+ * logs, and omits it entirely when password sign-in is off.
  */
 export type CreatedRecruiter = {
   userId: string;
@@ -151,6 +156,17 @@ export async function createRecruiterAction(
 
   revalidatePath("/admin/recruiters");
   revalidatePath("/admin/actions");
+
+  // Welcome mail with sign-in details, after the response. Never throws, so
+  // a mail failure cannot undo or fail the account the admin just created.
+  const welcome = {
+    to: input.email.trim().toLowerCase(),
+    fullName: input.fullName,
+    companyName: input.companyName,
+    password,
+    passwordLoginEnabled: isEmailLoginEnabled(),
+  };
+  after(() => sendRecruiterWelcomeEmail(welcome));
 
   return {
     ok: true,

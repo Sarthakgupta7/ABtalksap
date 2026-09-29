@@ -57,10 +57,11 @@ export function WorkshopConfigPanel({
   return (
     <section className="space-y-4 rounded-xl border p-5">
       <div>
-        <h2 className="font-semibold">Workshop page</h2>
+        <h2 className="font-semibold">Workshop page &amp; links</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Controls the public /workshop experience. The countdown is not here —
-          it comes from the workshop&apos;s own date and time.
+          Controls the public /workshop experience, including the Zoom and
+          WhatsApp links used by the registration flow. The countdown is not
+          here — it comes from the workshop&apos;s own date and time.
         </p>
       </div>
 
@@ -101,6 +102,10 @@ export function WorkshopConfigPanel({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="wk-whatsapp">WhatsApp community link</Label>
+          <p className="text-xs text-muted-foreground">
+            Shown after registering, and in the confirmation email.
+            <span className="font-mono"> workshop.whatsapp_link</span>
+          </p>
           <Input
             id="wk-whatsapp"
             value={v.whatsappLink}
@@ -109,7 +114,11 @@ export function WorkshopConfigPanel({
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="wk-zoom">Joining link</Label>
+          <Label htmlFor="wk-zoom">Zoom / joining link</Label>
+          <p className="text-xs text-muted-foreground">
+            The join button in the confirmation email. Empty hides that button.
+            <span className="font-mono"> workshop.zoom_link</span>
+          </p>
           <Input
             id="wk-zoom"
             value={v.zoomLink}

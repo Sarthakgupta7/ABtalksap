@@ -257,6 +257,20 @@ client component. No functions, icons or class instances cross the boundary.
 
 ### Phase 1
 
+**Phase 1 ships as 1a then 1b, approved separately.**
+
+- **1a — the data operation.** Steps 1–4: schema, migration, seed, 24-field
+  round-trip, registration integrity. `EVENTS` stays intact, no consumer or
+  importer is touched, the notification module is not touched, and public
+  behaviour is unchanged. If the port is wrong, it is found here — before
+  fourteen consumers depend on it.
+- **1b — the source-of-truth swap.** Steps 5–6 plus §8a: repository,
+  parameterised helpers, server parents, client props, the notification seam,
+  and only then deleting `EVENTS`. **Do not begin 1b until 1a's verification
+  passes and is approved.** 1b is not approved on a green build alone — it needs
+  the before/after behavioural comparison, equivalent except for the deliberate
+  visibility/TBA change.
+
 **Scope fence.** Phase 1 is items 1–6 below plus §8a and nothing else. It must
 not touch admin CRUD, poster upload, Blob infrastructure, the `PlatformConfig`
 migration, the coming-soon design, or the calendar toggle. Those are phases 2

@@ -82,8 +82,10 @@ export type MatchCardData = {
   openToWork: boolean;
   /**
    * Plan 154: built from a résumé an admin imported; the student has not
-   * signed in to confirm it. Everything on the card is still only what the
-   * résumé says, and contact stays locked until they do.
+   * signed in to confirm it, so everything on the card is only what the résumé
+   * says. The badge is why that is worth showing — plan 164 made these
+   * candidates unlockable like any other, so a recruiter can now buy contact
+   * details attached to data nobody has confirmed.
    */
   importedUnclaimed?: boolean;
   shortlisted?: boolean;

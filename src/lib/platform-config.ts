@@ -61,18 +61,18 @@ export const PLATFORM_CONFIG_KEYS = {
   /**
    * What a recruiter workspace is granted the first time it is created.
    *
-   * $200.00 is the value T-228 specifies. It is the current *default*, not a
-   * constant: changing this row to 10000 makes the next workspace start with
-   * $100 and does not touch anybody already granted, because the amount is
-   * frozen into the ledger row at grant time.
+   * $20,000.00 is the current *default*, not a constant: changing this row to
+   * 10000 makes the next workspace start with $100 and does not touch anybody
+   * already granted, because the amount is frozen into the ledger row at grant
+   * time.
    */
   "credits.starting_grant_minor": {
     kind: "int",
-    default: 20_000,
+    default: 2_000_000,
     min: 0,
     max: 10_000_000,
     description:
-      "Credits granted once, when a recruiter workspace is created. USD cents. 20000 = $200.00.",
+      "Credits granted once, when a recruiter workspace is created. USD cents. 2000000 = $20000.00.",
   },
   /**
    * What one contact unlock costs.

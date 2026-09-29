@@ -465,3 +465,289 @@ jobs, hire, resume or recruiter paths.
 - `Move the workshop schedule into the database`
 - `Let an admin create and archive workshops from the console`
 - `Add a coming-soon state, calendar toggle and posters to the workshop page`
+
+## 14. Amendment — finishing the feature (2026-09-29)
+
+To be folded into `docs/plans/163-admin-workshop-management.md` on approval
+(plan mode may only write this scratch file). Same branch,
+`feat/admin-workshop-management`. **Commits `fe73cc5e` (1a) and `a39c272e` (1b)
+stay — nothing here reverts or redoes them.**
+
+## Context
+
+Phases 1a and 1b are done and verified: the schedule lives in `WorkshopEvent`,
+all ten legacy events are ported and archived with their 366 registrations
+intact, and every consumer reads through `src/repositories/workshop.ts`.
+
+Manual verification then found `/workshop` still showing a workshop. Phase 1
+was never meant to deliver admin CRUD or the Coming Soon screen — those are
+phases 2 and 3 — so the outstanding items below are mostly *not yet built*
+rather than broken. One thing genuinely is broken, and it is not what it looked
+like.
+
+## The leak — corrected diagnosis
+
+**No archived row is escaping.** `listPublicEvents()` filters
+`publishedAt != null AND archivedAt == null` and correctly returns `[]`;
+`getRegistrableEvent` correctly returns `undefined`.
+
+The phantom workshop comes from **fallbacks that fire when there is no event**:
+
+| Source | What it renders |
+|---|---|
+| `WorkshopHero.tsx:147` `DEFAULT_TITLE` | "Create Anything with AI: From Prompt to Published Content" |
+| `WorkshopHero.tsx:144` `DEFAULT_DESC` | a full workshop description |
+| `TopicsSection.tsx:169` `DEFAULT_TOPICS` | ten topic capsules |
+| **Supabase** `workshop_config` → `config.webinarDate` / `webinarTargetUtc` | a stale date chip, and a countdown that `Math.max(0, …)` freezes at **00:00:00:00** |
+
+So the page advertises a workshop that exists nowhere, with a dead countdown and
+a Register button whose action always refuses (`CLOSED_MESSAGE`). It is worse
+than a stale row: none of this content is in the database, so no admin can fix
+it. This is what phase 1c exists to kill.
+
+`/workshop/events` is already correct — with `[]` it renders `ComingSoonCard`.
+
+## Decisions locked
+
+- **Coming Soon is automatic, with an admin override.** No published upcoming
+  event ⇒ Coming Soon, always, with no admin action. `workshop.mode` can force
+  it on early. Derived-by-default makes the leak structurally impossible; a
+  manual-only toggle is exactly how this bug happened.
+- **The hardcoded fallbacks are removed.** Hero and topics render only when
+  there is a real published event to describe. No copy is left that can
+  describe a workshop nobody scheduled.
+
+## The admin control surface
+
+**Requirement.** The admin controls the public workshop experience end-to-end
+without a deployment: creating / editing / publishing / archiving workshops,
+managing the poster (upload, replace, **remove**), editing the calendar and its
+visibility, and switching `/workshop` between LIVE and a dedicated
+COMING_SOON state.
+
+These are **four independent controls**, and keeping them independent is what
+stops this becoming a tangle of implicit rules:
+
+```
+Workshop
+├── lifecycle : DRAFT / PUBLISHED / ARCHIVED   (publishedAt, archivedAt)
+├── poster    : present / absent               (posterUrl)
+├── calendar  : visible / hidden               (workshop.calendar_visible)
+└── page mode : LIVE / COMING_SOON             (workshop.mode + derived)
+```
+
+**Poster removal ≠ workshop removal ≠ Coming Soon.** Removing a poster nulls
+`posterUrl` and deletes the blob; the workshop row, its lifecycle and its
+roster are untouched. A published workshop with no poster still renders LIVE —
+the hero simply draws without a poster image.
+
+The one deliberate coupling, and the only one:
+
+| Published upcoming event? | `workshop.mode` | Public page |
+|---|---|---|
+| yes | `LIVE` (or unset) | full experience |
+| yes | `COMING_SOON` | Coming Soon — admin override wins |
+| **no** | anything | **Coming Soon** — derived, cannot be overridden into LIVE |
+
+Nothing else feeds the mode. Poster absence never does.
+
+**One definition of "an active public workshop", and it is the existing
+eligibility rule** — `publishedAt != null AND archivedAt == null AND
+registrationOpen AND date is upcoming`. Do not grow a second notion of "active"
+anywhere. A consequence worth stating out loud: an event that is published and
+upcoming but has `registrationOpen = false` is **not** eligible, so the page
+shows Coming Soon. That is intended — `registrationOpen: false` is the
+documented kill switch for a session, and a page offering a signup that the
+server will refuse is the bug this whole phase exists to remove.
+
+In the admin UI the two must be visibly distinct actions, not one control with
+two meanings:
+- **Remove poster** — the poster disappears; the workshop stays LIVE.
+- **Show Coming Soon** — the entire hero/workshop presentation disappears.
+
+> **Ambiguity resolved.** The requirement's poster bullet reads "if there is no
+> poster / the admin chooses to hide the hero … show Coming Soon instead",
+> which can be read as *no poster ⇒ Coming Soon* — the exact coupling the same
+> requirement then forbids. Taken as: the **admin's choice** hides the hero
+> (that is the mode switch); a missing poster does not. Flagging it rather than
+> picking silently.
+
+When COMING_SOON is active the page must surface **no** legacy or archived
+workshop, **no** stale countdown, **no** registration CTA and **no** old hero
+poster. The calendar stays at the bottom when enabled, showing the existing TBA
+placeholders.
+
+## Phase 1c — kill the leak (do this first, ships alone)
+
+Smallest change that makes the public page honest. No new config, no admin work.
+
+- `src/components/workshop/WorkshopHero.tsx` `[edit]` — delete `DEFAULT_TITLE`,
+  `DEFAULT_DESC`, `DEFAULT_TITLE_ACCENTS`; the component now requires a real
+  event.
+- `src/components/workshop/TopicsSection.tsx` `[edit]` — delete `DEFAULT_TOPICS`.
+- `src/components/workshop/WorkshopComingSoon.tsx` `[new]` — the dedicated
+  screen. Server Component, no interactivity.
+- `src/app/workshop/page.tsx` `[edit]` — branch: with no registrable event,
+  render header → `WorkshopComingSoon` → **calendar** → footer, and **not** the
+  hero, topics, stats, registration modal or `#register` CTA.
+
+The countdown and date chip disappear with the hero, which removes the Supabase
+dependency from the empty state without touching `workshop_config` yet — that
+retirement stays in phase 3.
+
+**Design note:** the Coming Soon screen is a public visual surface. `ComingSoonCard`
+(`src/components/workshop/ComingSoonCard.tsx`) is the existing in-house
+treatment — dashed border, orbiting radial glow, floating ✨, bouncing dots —
+and the new screen should read as its full-page sibling rather than a new
+visual language. **Get Shallika's sign-off on this screen** (UI/UX ownership).
+
+## Phase 2 — admin event management
+
+`/admin/workshop` has Registrations and Analytics. Add **Events**.
+
+- `src/app/actions/admin-workshop-actions.ts` `[new]` — create / update /
+  publish / **unpublish** / archive / **unarchive**. `requireAdmin` + Zod +
+  `{ ok, data } | { ok, message }`, each writing an `AdminAction` row via
+  `writeAudit`. Unpublish and unarchive exist so every lifecycle move is
+  reversible from the console; an admin who publishes early must not need a
+  developer.
+- `src/components/admin/workshop-event-form.tsx` `[new]` (client)
+- `src/components/admin/workshop-events-table.tsx` `[new]` (client) — lists all
+  events including the ten archived ones, with registration counts.
+- `src/app/admin/workshop/page.tsx` `[edit]` — third tab.
+- `src/repositories/workshop.ts` `[edit]` — the write functions.
+
+Also **delete**, which the main plan's goal allows but no action provided:
+permitted **only when that event's `WorkshopRegistration` count is zero**.
+Count and delete in one transaction so a signup landing mid-request cannot slip
+through, and refuse otherwise. The UI must make the two cases visibly
+different — **Delete** on an empty roster, **Archive** on a registered one,
+never one button that quietly does whichever applies.
+
+**Id collision.** On create, derive `workshop-YYYY-MM-DD` and **refuse if that
+id already exists** with a clear validation error. Never `upsert` a
+newly-created workshop over an existing row — that is how two workshops end up
+sharing one roster, the failure `events-data.ts` warned about. The legacy ids
+are arbitrary (`linkedin-ai-interview`, `ai-workshop-live`, …) so a derived id
+can collide with one only by coincidence, but the check is cheap and the
+failure is unrecoverable.
+
+**Date → id must not shift.** Derive the id from the admin's chosen calendar
+date as they typed it, not from a UTC conversion of a local `Date`. Picking
+2026-10-10 must always give `workshop-2026-10-10`, never `-09` or `-11`. The
+stored `date` column follows the port's convention, `new Date(`${iso}T00:00:00Z`)`
+— the same one `prisma/scripts/seed-workshop-events.ts` uses and the round-trip
+check proved.
+
+Rules (unchanged from the main plan): the id is **derived from the date and
+read-only**, never an input; mirror `AccountOpsDialog`'s reason-plus-confirm for
+consequential writes.
+
+An admin must be able to create and publish a workshop with no deploy — that is
+this phase's acceptance test.
+
+## Phase 3 — configuration, calendar toggle, posters
+
+- `src/lib/platform-config.ts` `[edit]` — register `workshop.mode`,
+  `workshop.calendar_visible`, `workshop.zoom_link`, `workshop.whatsapp_link`,
+  `workshop.coming_soon_message`.
+
+  **Blocker found:** the registry has `getStringConfig` / `resolveStringConfig`
+  but **only `writeIntConfig`** — there is no string writer, so string keys are
+  read-only today. `writeStringConfig` must be added, mirroring `writeIntConfig`
+  including its audit write. This is a shared config module; it is in my
+  ownership (System configuration) but call it out in review.
+- `src/components/admin/platform-config-panel.tsx` `[edit]` — expose the keys.
+- `src/features/workshop/storage.ts` `[new]` — **public** Blob put/delete,
+  modelled on `src/features/resume/storage.ts` but `access: "public"` and a
+  **different store**. Validate magic bytes server-side as
+  `src/features/resume/ingest.ts` does for PDFs; cap the size.
+- `src/app/actions/admin-workshop-actions.ts` `[edit]` — three poster actions,
+  deliberately separate from the lifecycle ones:
+  - **upload** — store the blob, write `posterUrl`;
+  - **replace** — store the new blob, write `posterUrl`, then delete the old
+    one *after* the write succeeds, so a failed upload never leaves the
+    workshop with neither (the rule `features/resume/service.ts` already
+    follows);
+  - **remove** — null `posterUrl` and delete the blob. **The workshop row, its
+    lifecycle and its roster are untouched**, and the page stays LIVE.
+- `src/components/workshop/EventsCalendar.tsx` `[edit]` — respect
+  `workshop.calendar_visible`.
+- `src/app/workshop/page.tsx` `[edit]` — `workshop.mode` forces Coming Soon on
+  top of the automatic rule from 1c.
+- Retire `getWorkshopConfig()` and the Supabase import once the keys move. Leave
+  the cohort-application readers in `workshop-supabase.ts` alone.
+
+## Guardrails (in addition to the main plan's §9)
+
+- **Do not revert or redo 1a/1b.** Touch the migration, the seed, the snapshot
+  or `src/repositories/workshop.ts`'s read path only if a concrete defect is
+  found, and report it rather than quietly reworking it.
+- **Do not make `/workshop` or `/workshop/events` admin-only or remove them.**
+  They stay public — logged-out cold traffic is the point.
+- **Do not reintroduce default workshop copy** anywhere. No event means no hero.
+- **Do not couple the four controls.** Specifically: removing a poster must not
+  archive, unpublish or delete the workshop, and must not put the page into
+  COMING_SOON. Archiving must not clear the poster. The only input to the mode
+  is `workshop.mode` plus "is there a published upcoming event" — never
+  `posterUrl`, never a count of anything else. If the implementation finds
+  itself writing `if (!posterUrl) return <ComingSoon/>`, it has gone wrong.
+- **Keep `placeholderSaturdays`.** The generated "Workshop — TBA" Saturday tiles
+  are the intended calendar behaviour and must survive; `openWorkshops` must go
+  on excluding placeholders so TBA never becomes a registerable card.
+- **The calendar stays at the bottom of the public page**, in both the normal
+  and the Coming Soon state.
+- Do not touch notifications beyond the seam already approved and shipped in 1b.
+- Do not widen `evidence-provenance`'s optional `workshopEvents` into a required
+  field — 19 existing test call sites depend on it being optional.
+
+## Deployment sequence (matters)
+
+1. **1a's migration + seed must run against production before 1b's code ships**,
+   or `/workshop` reads an empty table. The seed is self-contained
+   (`prisma/content/workshop-events.json`) and idempotent, so it can run first.
+2. 1c can ship any time after 1b.
+3. Phase 3 retires the Supabase config — do not delete the `workshop_config` row
+   until the `PlatformConfig` keys are written and read in production.
+
+## Verification
+
+**1c.** With zero published events, `/workshop` shows the Coming Soon screen and
+the calendar, and **no** hero, countdown, topics, stats or Register CTA. Grep the
+built page for "Create Anything with AI" — it must be absent. `/workshop/events`
+still shows `ComingSoonCard`. Then publish one event (via a temporary DB write
+or phase 2) and confirm the full page returns and the countdown targets that
+event.
+
+**2.** Create a workshop in the console → confirm the derived id, that it is
+**not** public while unpublished, then publish → it becomes the first publicly
+visible workshop and replaces Coming Soon. An `AdminAction` row is written.
+Deleting one with registrations is refused. A non-admin gets nothing.
+`npx tsx prisma/scripts/verify-workshop-events-port.ts` still passes — the ten
+archived rows and 366 registrations are untouched by any of this.
+
+**3.** Flip `workshop.mode` to `COMING_SOON` with a published event present and
+confirm the override wins; flip back. Toggle the calendar off and on. Upload a
+poster and confirm it renders **while logged out**; a non-image and an oversized
+file are refused server-side.
+
+**3b — the four controls are independent.** This is the check that catches the
+tangle, and each row must be verified on its own:
+
+| Do this | Expect |
+|---|---|
+| Publish an event with **no** poster | page is **LIVE**, hero renders without a poster image — *not* Coming Soon |
+| **Remove** the poster from a published event | still LIVE; the workshop row, `publishedAt` and its roster unchanged |
+| Replace a poster | new image renders, old blob gone, `posterUrl` never null in between |
+| Archive an event that has a poster | `posterUrl` still set on the row; it is simply no longer public |
+| `mode = COMING_SOON` **with** a published event | Coming Soon, and no hero, countdown, CTA or poster anywhere in the markup |
+| Hide the calendar while LIVE | calendar gone, hero and CTA untouched |
+| No published event, `mode = LIVE` | still Coming Soon — the derived rule cannot be overridden into LIVE |
+
+Then re-run `npx tsx prisma/scripts/verify-workshop-events-port.ts`: the ten
+archived rows and all 366 registrations must be untouched by any of it.
+
+Every phase: `npx tsc --noEmit`, `npx eslint` on touched files, `npm run build`
+— all three need `NODE_OPTIONS=--max-old-space-size=8192` on this machine. Lint
+baseline is 1 pre-existing error in `EventsCalendar.tsx` (`setState` in an
+effect, present on master); do not let it grow.

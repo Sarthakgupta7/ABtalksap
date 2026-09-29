@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import WorkshopHeader from "@/components/workshop/Header";
 import { DashboardFooter } from "@/components/dashboard-hub/dashboard-footer";
 import WorkshopHero from "@/components/workshop/WorkshopHero";
+import WorkshopComingSoon from "@/components/workshop/WorkshopComingSoon";
 import RegistrationModal from "@/components/workshop/RegistrationModal";
 import TopicsSection from "@/components/workshop/TopicsSection";
 import CommunityStats from "@/components/workshop/CommunityStats";
@@ -15,16 +16,26 @@ import { getMyRegistration } from "@/features/workshop/registration-status";
 import { getWorkshopConfig } from "@/lib/workshop-supabase";
 import { listPublicEvents } from "@/repositories/workshop";
 
+/*
+ * Track-neutral on purpose.
+ *
+ * This used to name one specific session — "FREE 1-Hour Live LinkedIn
+ * Workshop" — with a keyword list to match. That workshop ran on 21 August and
+ * is archived, so every search result and link preview advertised a workshop
+ * that is over: the same phantom as the hero's hardcoded title, just in the
+ * <head> where it is easier to miss. Plan 163 phase 1c.
+ *
+ * Phase 2 can make this `generateMetadata` and describe whichever workshop is
+ * actually published.
+ */
 export const metadata: Metadata = {
-  title: "ABTalks | Workshops Every week",
+  title: "ABTalks | Live Workshops",
   description:
-    "Join ABTalks' FREE 1-Hour Live LinkedIn Workshop on YouTube Live. Build a recruiter-ready profile, post content that actually gets seen, and use AI tools to stay consistent.",
-  keywords:
-    "LinkedIn, personal branding, LinkedIn profile, headline, About section, content strategy, LinkedIn posts, hooks, AI content creation, ChatGPT, Canva, scheduling, LinkedIn growth, analytics, networking, workshop, ABTalks",
+    "Free live workshops from ABTalks, most Saturdays on YouTube. Practical AI, career and build sessions — see what is coming up and catch the past recordings.",
   openGraph: {
-    title: "ABTalks | Workshops Every week",
+    title: "ABTalks | Live Workshops",
     description:
-      "Join the FREE 1-Hour Live LinkedIn & Personal Branding Workshop",
+      "Free live workshops from ABTalks, most Saturdays on YouTube.",
     type: "website",
   },
 };
@@ -70,25 +81,41 @@ export default async function AIWorkshopPage() {
 
         <WorkshopHeader isSignedIn={Boolean(userId)} />
 
-        {/* The hero, the topics and the registration form all describe the SAME
-          workshop — the one `getRegistrableEvent` resolved above. Passing it
-          down as primitives keeps that true and keeps the LucideIcon on the
-          event off the Server→Client boundary. */}
-        <WorkshopHero
-          webinarDate={config.webinarDate}
-          webinarTime={config.webinarTime}
-          webinarTargetUtc={config.webinarTargetUtc}
-          eventTitle={event?.title ?? null}
-          eventAccents={event?.titleAccents ?? null}
-          eventDesc={event?.desc ?? null}
-          eventPoster={event?.posterSrc ?? null}
-        />
+        {/*
+          No eligible workshop means no hero.
 
-        <div id="curriculum" className="scroll-mt-16">
-          <TopicsSection topics={event?.topics ?? null} />
-        </div>
+          `event` is `getRegistrableEvent(events)` over the published,
+          unarchived list, so this branch is the single definition of "is there
+          an active public workshop". The page used to have no branch at all:
+          the hero, the topics and the countdown each carried their own
+          fallback, and together they advertised a workshop that existed
+          nowhere. Plan 163 phase 1c.
 
-        <CommunityStats />
+          The hero, the topics and the registration form all describe the SAME
+          workshop. Passing primitives keeps that true and keeps the event's
+          fields off the Server→Client boundary.
+        */}
+        {event ? (
+          <>
+            <WorkshopHero
+              webinarDate={config.webinarDate}
+              webinarTime={config.webinarTime}
+              webinarTargetUtc={config.webinarTargetUtc}
+              eventTitle={event.title}
+              eventAccents={event.titleAccents ?? []}
+              eventDesc={event.desc}
+              eventPoster={event.posterSrc ?? null}
+            />
+
+            <div id="curriculum" className="scroll-mt-16">
+              <TopicsSection topics={event.topics ?? []} />
+            </div>
+
+            <CommunityStats />
+          </>
+        ) : (
+          <WorkshopComingSoon />
+        )}
 
         {/* `scroll-mt-16` clears the 54px sticky header so the calendar's
           heading is not hidden under it when "Discover events" jumps here. */}

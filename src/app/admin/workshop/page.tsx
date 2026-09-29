@@ -2,13 +2,13 @@ import Link from "next/link";
 import { WorkshopAnalyticsPanel } from "@/components/admin/workshop-analytics";
 import { WorkshopEventPicker } from "@/components/admin/workshop-event-picker";
 import { WorkshopRegistrationsView } from "@/components/admin/workshop-registrations-view";
-import { EVENTS } from "@/components/workshop/events-data";
 import {
   getWorkshopEventCounts,
   getWorkshopRegistrations,
 } from "@/features/workshop/get-admin-data";
 import { getWorkshopAnalytics } from "@/features/workshop/get-workshop-analytics";
 import { requireAdmin } from "@/lib/admin-auth";
+import { getEventTitles } from "@/repositories/workshop";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -32,7 +32,7 @@ export default async function AdminWorkshopPage({
 
   const counts = await getWorkshopEventCounts();
 
-  const titleById = new Map(EVENTS.map((e) => [e.id, e.title]));
+  const titleById = await getEventTitles(counts.map((c) => c.eventId));
   const pickerEvents = counts.map((c) => ({
     eventId: c.eventId,
     label: titleById.get(c.eventId) ?? c.eventId,

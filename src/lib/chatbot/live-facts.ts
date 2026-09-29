@@ -73,9 +73,11 @@ async function readEvents(todayKey: string): Promise<{
       registrationOpen: Boolean(e.register && e.registrationOpen),
     });
 
-    const upcoming = mod.upcomingEvents(todayKey);
-    const registrable = mod.getRegistrableEvent();
-    const past = mod.pastEvents(todayKey);
+    const { listPublicEvents } = await import("@/repositories/workshop");
+    const events = await listPublicEvents();
+    const upcoming = mod.upcomingEvents(events, todayKey);
+    const registrable = mod.getRegistrableEvent(events);
+    const past = mod.pastEvents(events, todayKey);
 
     return {
       next: upcoming[0] ? toLive(upcoming[0]) : null,

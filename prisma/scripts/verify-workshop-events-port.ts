@@ -1,10 +1,9 @@
 /**
  * Plan 163 phase 1a verification. READ ONLY.
  *
- * Compares every field of every `EVENTS` entry against its `WorkshopEvent`
- * row. This can only run while `EVENTS` still exists, which is why phase 1a
- * ends here and `EVENTS` is not removed until 1b: after it is deleted the
- * comparison is impossible and the port can never be proved again.
+ * Compares every field of every seeded event against its `WorkshopEvent` row,
+ * checks every stored icon name resolves in the client map, and checks the
+ * roster gate. Safe to point at production.
  *
  * Also checks the two things that make the port safe rather than merely
  * complete: every registration's `eventId` resolves to a row, and the
@@ -13,7 +12,17 @@
  *   npx tsx prisma/scripts/verify-workshop-events-port.ts
  */
 import { PrismaClient } from "@prisma/client";
-import { EVENTS, type WorkshopEvent } from "../../src/components/workshop/events-data";
+import { knownIconNames } from "../../src/components/workshop/events-data";
+import { loadSeedEvents } from "./seed-workshop-events";
+
+/**
+ * Compares the database against `prisma/content/workshop-events.json` — the
+ * frozen snapshot of the old `EVENTS` array, verified field for field while
+ * that array still existed. Phase 1b deleted the array, so the snapshot is now
+ * the reference, and this stays runnable against production.
+ */
+const EVENTS = loadSeedEvents();
+type WorkshopEvent = (typeof EVENTS)[number];
 
 const prisma = new PrismaClient();
 
@@ -52,10 +61,6 @@ function canonical(value: unknown): unknown {
 }
 
 const isoOf = (d: Date) => d.toISOString().slice(0, 10);
-const iconNameOf = (e: WorkshopEvent) =>
-  ((e.Icon as unknown as { displayName?: string; name?: string }).displayName ??
-    (e.Icon as unknown as { name?: string }).name ??
-    "").trim();
 
 async function main() {
   console.log("Plan 163 phase 1a — port verification\n");
@@ -85,39 +90,43 @@ async function main() {
     }
     const before = failures;
     check("date", isoOf(r.date), e.date);
-    check("timeLabel", r.timeLabel, e.time);
+    check("timeLabel", r.timeLabel, e.timeLabel);
     check("title", r.title, e.title);
-    check("description", r.description, e.desc);
+    check("description", r.description, e.description);
     check("host", r.host, e.host);
     check("location", r.location, e.location);
     check("tag", r.tag, e.tag);
     check("accent", r.accent, e.accent);
-    check("iconName", r.iconName, iconNameOf(e));
-    check("track", r.track, e.track.toUpperCase());
-    check("posterUrl", r.posterUrl, e.posterSrc ?? null);
-    check("registrationOpen", r.registrationOpen, e.registrationOpen ?? true);
-    check("register", r.register, e.register ?? false);
-    check("externalHref", r.externalHref, e.href ?? null);
-    check("ctaLabel", r.ctaLabel, e.ctaLabel ?? null);
-    check("youtubeId", r.youtubeId, e.youtubeId ?? null);
-    check("duration", r.duration, e.duration ?? null);
-    check("titleAccents", r.titleAccents, e.titleAccents ?? []);
-    check("takeaways", r.takeaways, e.takeaways ?? []);
-    check("topics", r.topics, e.topics ?? []);
+    check("iconName", r.iconName, e.iconName);
+    check("track", r.track, e.track);
+    check("posterUrl", r.posterUrl, e.posterUrl);
+    check("registrationOpen", r.registrationOpen, e.registrationOpen);
+    check("register", r.register, e.register);
+    check("externalHref", r.externalHref, e.externalHref);
+    check("ctaLabel", r.ctaLabel, e.ctaLabel);
+    check("youtubeId", r.youtubeId, e.youtubeId);
+    check("duration", r.duration, e.duration);
+    check("titleAccents", r.titleAccents, e.titleAccents);
+    check("takeaways", r.takeaways, e.takeaways);
+    check("topics", r.topics, e.topics);
     check("resources", canonical(r.resources ?? null), canonical(e.resources ?? null));
-    check("durationMinutes", r.durationMinutes, e.durationMinutes ?? null);
+    check("durationMinutes", r.durationMinutes, e.durationMinutes);
     console.log(
       `  ${failures === before ? "PASS" : "FAIL"}  ${e.id}  (22 fields)`,
     );
   }
 
-  console.log("\n3. `placeholder` is not persisted:");
-  const anyPlaceholder = EVENTS.some((e) => e.placeholder === true);
+  console.log("\n3. Every stored icon name resolves in the client map:");
+  const known = new Set(knownIconNames());
+  for (const r of rows) {
+    const ok = known.has(r.iconName);
+    if (!ok) failures++;
+    if (!ok) console.log(`  FAIL  ${r.id} -> "${r.iconName}" is not in ICONS`);
+  }
   console.log(
-    `  ${anyPlaceholder ? "FAIL" : "PASS"}  no real event carries placeholder ` +
-      `(it marks generated TBA tiles only)`,
+    `  ${rows.every((r) => known.has(r.iconName)) ? "PASS" : "FAIL"}  ` +
+      `${rows.length} names checked against iconFor's map`,
   );
-  if (anyPlaceholder) failures++;
 
   console.log("\n4. Historical, not public:");
   const archived = rows.filter((r) => r.archivedAt !== null).length;
@@ -145,7 +154,7 @@ async function main() {
 
   console.log(
     failures === 0
-      ? "\nALL CHECKS PASSED — the port is proved while EVENTS still exists."
+      ? "\nALL CHECKS PASSED — database matches the verified snapshot."
       : `\n${failures} CHECK(S) FAILED`,
   );
   process.exitCode = failures === 0 ? 0 : 1;

@@ -36,12 +36,13 @@ const ids = (list: readonly WorkshopEvent[] | undefined) =>
 
 /**
  * Before the refactor the helpers close over `EVENTS` and take no events
- * argument; after it they take one first. `EVENTS` disappearing from the module
- * is exactly the change, so it is the most reliable thing to branch on —
- * function arity is not, because default parameters do not count toward
- * `Function.length` (`getRegistrableEvent(nowMs = Date.now())` reports 0).
+ * argument; after it they take one first. `upcomingEvents` is the reliable
+ * probe: it has no default parameters, so its arity really does go 1 -> 2.
+ * (`getRegistrableEvent` would not work — a default parameter does not count
+ * toward `Function.length`, so it reports 0 either way.)
  */
-const IS_PARAMETERISED = !("EVENTS" in (data as Record<string, unknown>));
+const IS_PARAMETERISED =
+  (data.upcomingEvents as unknown as { length: number }).length >= 2;
 
 function shape(events: readonly WorkshopEvent[]) {
   const mod = data as unknown as Record<string, (...a: unknown[]) => unknown>;
@@ -105,8 +106,7 @@ function toWorkshopEvent(row: {
     tag: row.tag,
     accent: row.accent,
     track: row.track.toLowerCase() as WorkshopEvent["track"],
-    Icon: (data as unknown as { iconFor?: (n: string) => WorkshopEvent["Icon"] })
-      .iconFor?.(row.iconName) ?? (undefined as unknown as WorkshopEvent["Icon"]),
+    iconName: row.iconName,
     title: row.title,
     desc: row.description,
     host: row.host,

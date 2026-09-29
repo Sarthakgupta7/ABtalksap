@@ -1,122 +1,104 @@
 /**
- * Plan 163 phase 1a: port the hardcoded workshop schedule into the database.
+ * Plan 163 phase 1a: port the workshop schedule into the database.
  *
- * Reads `EVENTS` from `src/components/workshop/events-data.ts` and writes one
- * `WorkshopEvent` row per entry. The array is the input, deliberately: hand-
- * copying ten objects is where date, `resources`, `externalHref`, `ctaLabel`
- * and `registrationOpen` bugs get in, and they stay invisible until a past
- * workshop renders wrong months later.
+ * Reads `prisma/content/workshop-events.json` — the ten events exactly as they
+ * were verified out of the old hardcoded `EVENTS` array, field for field, by
+ * `verify-workshop-events-port.ts` while that array still existed.
  *
- * Three rules this script exists to enforce:
+ * **The snapshot is the input, not the old array.** Phase 1b deleted `EVENTS`,
+ * so a script importing it could never run again — and production still needs
+ * to be ported. Freezing the verified rows into `prisma/content/` (this repo's
+ * convention for seeded content) keeps this runnable anywhere, in any order,
+ * and makes what it writes reviewable in the diff.
+ *
+ * Three rules it exists to enforce:
  *
  * 1. **Ids are preserved verbatim.** `WorkshopRegistration.eventId` points at
  *    them by string, 366 rows deep. A changed id silently detaches a roster.
- * 2. **Every ported row is archived.** These are historical records. The public
- *    schedule starts empty; `placeholderSaturdays()` fills the calendar with
+ * 2. **Every ported row is archived.** These are historical records; the public
+ *    schedule starts empty and `placeholderSaturdays()` fills the calendar with
  *    TBA until an admin publishes something new.
- * 3. **`Icon` is a component and we store a name.** Derived from
- *    `displayName ?? name` and asserted non-empty before anything is written —
- *    an empty `iconName` would ship a blank card with no error.
+ * 3. **`iconName` is a name, never a component** — a component cannot be stored
+ *    and cannot cross the Server→Client boundary.
  *
  * Idempotent: `upsert` by id, so re-running changes nothing. It never deletes.
  *
  *   npx tsx prisma/scripts/seed-workshop-events.ts
  */
-import { PrismaClient, WorkshopTrack } from "@prisma/client";
-import { EVENTS, type WorkshopEvent } from "../../src/components/workshop/events-data";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { PrismaClient, type Prisma, type WorkshopTrack } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-const TRACK: Record<WorkshopEvent["track"], WorkshopTrack> = {
-  workshop: WorkshopTrack.WORKSHOP,
-  hackathon: WorkshopTrack.HACKATHON,
-  cohort: WorkshopTrack.COHORT,
-  challenge: WorkshopTrack.CHALLENGE,
+type SeedEvent = {
+  id: string;
+  date: string;
+  timeLabel: string;
+  title: string;
+  description: string;
+  host: string;
+  location: string;
+  tag: string;
+  accent: string;
+  iconName: string;
+  track: WorkshopTrack;
+  posterUrl: string | null;
+  registrationOpen: boolean;
+  register: boolean;
+  externalHref: string | null;
+  ctaLabel: string | null;
+  youtubeId: string | null;
+  duration: string | null;
+  titleAccents: string[];
+  takeaways: string[];
+  topics: string[];
+  resources: Prisma.InputJsonValue | null;
+  durationMinutes: number | null;
 };
 
-/**
- * The same UTC midnight `events-data.ts`'s own `utc()` helper uses, so the
- * stored instant round-trips back to the identical `YYYY-MM-DD` string.
- */
-function dateFromIso(iso: string): Date {
-  return new Date(`${iso}T00:00:00Z`);
-}
-
-/** Lucide sets `displayName`; `name` is the fallback for a plain function. */
-function iconNameOf(event: WorkshopEvent): string {
-  const icon = event.Icon as unknown as {
-    displayName?: string;
-    name?: string;
-  };
-  const resolved = (icon?.displayName ?? icon?.name ?? "").trim();
-  if (!resolved) {
-    throw new Error(
-      `[${event.id}] could not resolve an icon name from Icon. Refusing to ` +
-        `write an empty iconName — it renders a blank card with no error.`,
-    );
-  }
-  return resolved;
+export function loadSeedEvents(): SeedEvent[] {
+  return JSON.parse(
+    readFileSync(join(process.cwd(), "prisma/content/workshop-events.json"), "utf8"),
+  ) as SeedEvent[];
 }
 
 async function main() {
+  const events = loadSeedEvents();
   const archivedAt = new Date();
-  console.log(`Porting ${EVENTS.length} events. All will be archived.\n`);
-
-  // Resolve every icon BEFORE writing anything: a failure halfway through
-  // leaves a partial port, and this is the field most likely to fail.
-  const iconNames = new Map<string, string>();
-  for (const event of EVENTS) iconNames.set(event.id, iconNameOf(event));
+  console.log(`Porting ${events.length} events. All will be archived.\n`);
 
   const seen = new Set<string>();
-  for (const event of EVENTS) {
-    if (seen.has(event.id)) {
+  for (const e of events) {
+    if (seen.has(e.id)) {
       throw new Error(
-        `Duplicate id "${event.id}" in EVENTS — two workshops would share one ` +
-          `roster. Refusing to port.`,
+        `Duplicate id "${e.id}" — two workshops would share one roster. ` +
+          `Refusing to port.`,
       );
     }
-    seen.add(event.id);
+    seen.add(e.id);
+    if (!e.iconName.trim()) {
+      throw new Error(`[${e.id}] empty iconName — that renders a blank card.`);
+    }
   }
 
-  for (const event of EVENTS) {
+  for (const e of events) {
+    const { id, date, resources, ...rest } = e;
     const data = {
-      date: dateFromIso(event.date),
-      timeLabel: event.time,
-      title: event.title,
-      description: event.desc,
-      host: event.host,
-      location: event.location,
-      tag: event.tag,
-      accent: event.accent,
-      iconName: iconNames.get(event.id)!,
-      track: TRACK[event.track],
-      posterUrl: event.posterSrc ?? null,
-      registrationOpen: event.registrationOpen ?? true,
-      register: event.register ?? false,
-      externalHref: event.href ?? null,
-      ctaLabel: event.ctaLabel ?? null,
-      youtubeId: event.youtubeId ?? null,
-      duration: event.duration ?? null,
-      titleAccents: event.titleAccents ?? [],
-      takeaways: event.takeaways ?? [],
-      topics: event.topics ?? [],
-      resources: event.resources ?? undefined,
-      durationMinutes: event.durationMinutes ?? null,
-      // Historical records: never published, always archived.
+      ...rest,
+      date: new Date(`${date}T00:00:00Z`),
+      ...(resources == null ? {} : { resources }),
       publishedAt: null,
       archivedAt,
     };
-
     await prisma.workshopEvent.upsert({
-      where: { id: event.id },
-      create: { id: event.id, ...data },
+      where: { id },
+      create: { id, ...data },
       update: data,
       select: { id: true },
     });
-
     console.log(
-      `  ${event.id.padEnd(26)} ${event.date}  ${TRACK[event.track].padEnd(9)} ` +
-        `icon=${data.iconName}`,
+      `  ${id.padEnd(26)} ${date}  ${e.track.padEnd(9)} icon=${e.iconName}`,
     );
   }
 
@@ -135,9 +117,13 @@ async function main() {
   );
 }
 
-main()
-  .catch((error) => {
-    console.error("\nPORT FAILED:", error);
-    process.exitCode = 1;
-  })
-  .finally(() => prisma.$disconnect());
+// Only when run directly. `verify-workshop-events-port.ts` imports
+// `loadSeedEvents` from here, and importing a module must not port a database.
+if (process.argv[1]?.includes("seed-workshop-events")) {
+  main()
+    .catch((error) => {
+      console.error("\nPORT FAILED:", error);
+      process.exitCode = 1;
+    })
+    .finally(() => prisma.$disconnect());
+}

@@ -13,6 +13,7 @@ import { getRegistrableEvent } from "@/components/workshop/events-data";
 import { getWorkshopPrefill } from "@/features/workshop/get-prefill";
 import { getMyRegistration } from "@/features/workshop/registration-status";
 import { getWorkshopConfig } from "@/lib/workshop-supabase";
+import { listPublicEvents } from "@/repositories/workshop";
 
 export const metadata: Metadata = {
   title: "ABTalks | Workshops Every week",
@@ -31,9 +32,13 @@ export const metadata: Metadata = {
 export default async function AIWorkshopPage() {
   // This page stays PUBLIC — the marketing content, countdown and calendar must
   // render for logged-out cold traffic. Only the form overlay is gated.
-  const [config, session] = await Promise.all([getWorkshopConfig(), auth()]);
+  const [config, session, events] = await Promise.all([
+    getWorkshopConfig(),
+    auth(),
+    listPublicEvents(),
+  ]);
 
-  const event = getRegistrableEvent();
+  const event = getRegistrableEvent(events);
   const userId = session?.user?.id ?? null;
 
   const [alreadyRegistered, prefill] = userId
@@ -88,7 +93,7 @@ export default async function AIWorkshopPage() {
         {/* `scroll-mt-16` clears the 54px sticky header so the calendar's
           heading is not hidden under it when "Discover events" jumps here. */}
         <div id="events" className="scroll-mt-16">
-          <EventsCalendar />
+          <EventsCalendar events={events} />
         </div>
 
         {/* The same footer /marketplace and /dashboard render, rather than the

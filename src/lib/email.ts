@@ -87,6 +87,13 @@ export async function sendEmail(opts: {
    */
   bulk?: boolean;
   /**
+   * Secret values in this message's body (e.g. a one-time password). On a
+   * send failure they are stripped from the error before it is logged or
+   * sent to Sentry — Brevo can echo the request back inside its errors, and
+   * the generic scrubber does not recognise a bare password.
+   */
+  redact?: string[];
+  /**
    * Plan 152: Brevo tags for dashboard filtering. Defaulted to `[kind]` so
    * every send is filterable in Brevo's Statistics tab by message type.
    */
@@ -180,9 +187,19 @@ export async function sendEmail(opts: {
     // Brevo echoes the request — recipient address included — back inside the
     // error. `recordDelivery` runs it through `safeErrorMessage`, which is the
     // whole reason `String(error)` is not used here any more.
+    const secrets = (opts.redact ?? []).filter((s) => s.length > 0);
+    const safeError =
+      secrets.length === 0
+        ? error
+        : new Error(
+            secrets.reduce(
+              (msg, s) => msg.split(s).join("[redacted]"),
+              error instanceof Error ? error.message : String(error),
+            ),
+          );
     const { reason, sentryEventId } = await recordDelivery(deliveryId, ctx, {
       status: "FAILED",
-      error,
+      error: safeError,
     });
     return { ok: false, deliveryId, reason, sentryEventId };
   }

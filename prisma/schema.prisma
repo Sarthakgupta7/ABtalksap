@@ -1404,6 +1404,80 @@ model WorkshopRegistration {
 // NOTE: `workshop_config` deliberately stays in Supabase — only registrations
 // migrated. See src/lib/workshop-supabase.ts for the config reader.
 
+/// Which product track an event belongs to. Drives the calendar tile colour
+/// and what a click does — only `WORKSHOP` entries open the replay modal.
+///
+/// Deliberately its own enum. `NotificationCategory` carries the same four
+/// values but is a LOCKED enum in the notification module, and `CertificateType`
+/// is certificate semantics. Neither may be reused here — see plan 163 §5.
+enum WorkshopTrack {
+  WORKSHOP
+  HACKATHON
+  COHORT
+  CHALLENGE
+}
+
+/// A workshop or event on the public calendar. Plan 163.
+///
+/// Replaces the hardcoded `EVENTS` array in
+/// `src/components/workshop/events-data.ts`, so a new workshop is an admin
+/// action rather than a code change and a deploy.
+///
+/// **`id` is the roster key.** `WorkshopRegistration.eventId` points here by
+/// string, with no foreign key (366 rows predate this table). New ids follow
+/// `workshop-YYYY-MM-DD`; the ported ones keep whatever they already were,
+/// including three that predate that convention. It is never editable — a
+/// changed id silently detaches a roster.
+model WorkshopEvent {
+  id               String        @id
+  /// The calendar day. Day-precision: comparisons are on the IST calendar day,
+  /// which is what keeps an event under "Upcoming" for the whole of its own day.
+  date             DateTime
+  /// Display string as written, e.g. "7:00 PM IST" or "Day 1". Not parsed.
+  timeLabel        String
+  title            String
+  description      String
+  host             String
+  location         String
+  tag              String
+  accent           String
+  /// A lucide icon NAME, never a component: a component cannot be stored, and
+  /// this repo forbids passing one across the Server→Client boundary. The
+  /// name→component map lives in the client.
+  iconName         String
+  track            WorkshopTrack
+  /// A `/public` path on ported rows; a Blob URL once phase 3 lands. Both are
+  /// just URLs to an `<img>`, so one column serves both.
+  posterUrl        String?
+  /// Explicit kill switch. False closes signups without deleting the session.
+  registrationOpen Boolean       @default(true)
+  /// Its card links straight to the registration form.
+  register         Boolean       @default(false)
+  /// For events living outside the workshop funnel (e.g. the hackathon).
+  externalHref     String?
+  ctaLabel         String?
+  /// Replay and modal content — all arrive after the session runs.
+  youtubeId        String?
+  duration         String?
+  titleAccents     String[]      @default([])
+  takeaways        String[]      @default([])
+  topics           String[]      @default([])
+  /// `{ label, href, kind }[]`.
+  resources        Json?
+  /// Session length in minutes; absent falls back to DEFAULT_DURATION_MIN.
+  durationMinutes  Int?
+  /// Null until an admin publishes. Nothing unpublished is ever public.
+  publishedAt      DateTime?
+  /// Set on all ten ported events. Archived rows keep their registrations and
+  /// stay in the admin console, and are excluded from every public surface.
+  archivedAt       DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([date(sort: Desc)])
+  @@index([publishedAt, archivedAt, date])
+}
+
 /// General AB Talks AI Interview — a standardized, comparable talent signal
 /// built from a candidate's own verified challenge work. Separate from
 /// `ProgramInterview` (the 31-day AI Cohort exit interview), which is unrelated

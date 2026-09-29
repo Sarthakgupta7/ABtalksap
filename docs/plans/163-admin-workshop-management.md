@@ -99,10 +99,24 @@ model WorkshopEvent {
   /// crossed over the Server→Client boundary.
   iconName         String
   track            WorkshopTrack
+  /// Today a `/public` path (`posterSrc`); from phase 3 a Blob URL. Both are
+  /// just URLs to an `<img>`, so one column serves both and the port does not
+  /// need to distinguish them.
   posterUrl        String?
   registrationOpen Boolean  @default(true)
+  register         Boolean  @default(false)
   externalHref     String?
   ctaLabel         String?
+  // Replay + modal content. All optional; a workshop gets them after it runs.
+  youtubeId        String?
+  duration         String?
+  titleAccents     String[] @default([])
+  takeaways        String[] @default([])
+  topics           String[] @default([])
+  /// `{label, href, kind}[]`.
+  resources        Json?
+  /// Session length in minutes; absent falls back to DEFAULT_DURATION_MIN.
+  durationMinutes  Int?
   /// Null until an admin publishes. Nothing unpublished is ever public.
   publishedAt      DateTime?
   /// Set on all ten legacy events by the port. Archived rows keep their
@@ -120,6 +134,24 @@ model WorkshopEvent {
 `resources` (past-workshop links) is a small `{label, href, kind}[]` — a `Json`
 column is proportionate; do not build a second table.
 
+**Field coverage — checked against the real type, which is wider than an early
+draft of this plan assumed.** `WorkshopEvent` in `events-data.ts` has 24 fields
+and nearly all are consumed outside that file: `duration` (28 uses), `href`
+(10), `youtubeId` (8), `placeholder` (8), `register` (5), `topics` (4), and
+`posterSrc` / `takeaways` / `resources` / `ctaLabel` / `titleAccents` (1–2
+each). The model above now covers every one. Porting against a narrower model
+would have silently dropped replays, takeaways, topics and posters from all ten
+historical workshops.
+
+Renames to apply in the seed mapping, deliberately and explicitly:
+`time`→`timeLabel`, `desc`→`description`, `posterSrc`→`posterUrl`,
+`href`→`externalHref`.
+
+**`placeholder` is NOT a column.** It marks synthetic "Workshop — TBA" entries
+generated at runtime by `placeholderSaturdays()`, and is never true for a real
+event. Persisting it would invite someone to create a placeholder row. It stays
+a runtime-only flag on the generated objects.
+
 **`WorkshopTrack` is a genuinely new enum — checked.** There is no `*Track` enum
 in the schema today; `track` is currently the TS union
 `"workshop" | "hackathon" | "cohort" | "challenge"` in `events-data.ts`. Two
@@ -135,6 +167,15 @@ existing enums carry those same four values and **neither may be reused**:
 
 So: declare a new `WorkshopTrack`, and do not "helpfully" consolidate it with
 either of the above.
+
+**TBA already exists — do not build it.** `placeholderSaturdays(year, month)`
+generates synthetic "Workshop — TBA" tiles for every Saturday from
+`SATURDAY_SERIES_START` (2026-09-01) with no real event that day, and
+`eventsForMonth` merges them into the calendar. Once the ten legacy events are
+archived, the calendar fills with TBA on its own. Keep this generator; it is the
+mechanism that satisfies "empty means TBA". Note `openWorkshops` deliberately
+**excludes** placeholders, so TBA never appears as a registerable card — only as
+a calendar tile. Preserve that distinction exactly.
 
 **Lifecycle.** Public eligibility is a single rule, and every public read uses it:
 
@@ -164,8 +205,25 @@ New `PLATFORM_CONFIG_KEYS` entries, reusing the existing registry:
 - `prisma/scripts/seed-workshop-events.ts` `[new]` — one-time port of the 10 events, ids preserved, **`archivedAt` set on every one**
 - `src/repositories/workshop.ts` `[new]` — the read/write boundary
 - `src/components/workshop/events-data.ts` `[edit]` — keep the type, the `monthAbbr` / `dayNum` helpers and the icon-name→component map; **delete the `EVENTS` array**
-- `src/app/workshop/page.tsx`, `src/app/workshop/events/page.tsx`, `src/app/admin/workshop/page.tsx` `[edit]` — read from the repository
+- **14 importers of `events-data.ts`, 7 of them Client Components** `[edit]` — see the scope correction below
+- `src/features/notification/derive-event-notifications.ts` `[edit]` — **LOCKED path, narrow seam only**, see §8a
 - `.github/CODEOWNERS` `[edit]` — add the workshop paths (rule 13; there is no workshop entry today)
+
+#### Scope correction: it is not "three read sites"
+
+An early draft of this plan said three pages read the data. It is **14 files**,
+and the shape of the work is a props refactor, not a swap:
+
+| Kind | Files |
+|---|---|
+| **Client** (read `EVENTS` at module scope — a DB cannot serve them; each needs data threaded from a server parent) | `EventsCalendar`, `EventsTimeline`, `WorkshopHero`, `UpcomingWorkshops`, `WorkshopDetailsModal`, `HackathonPromoModal`, `dashboard-hub/events-section` |
+| **Server** | `app/workshop/page.tsx`, `app/workshop/events/page.tsx`, `app/admin/workshop/page.tsx`, `actions/workshop-actions.ts`, `features/dashboard/hub-search-index.ts`, `features/admin/evidence-provenance.ts`, `lib/chatbot/live-facts.ts` |
+| **Locked** | `features/notification/derive-event-notifications.ts` |
+
+Seven exported helpers close over the module array and must each take the events
+as a parameter instead: `upcomingEvents`, `pastEvents`, `placeholderSaturdays`,
+`eventsForMonth`, `openWorkshops`, `sidebarEvents`, `getRegistrableEvent`.
+They stay pure functions in `events-data.ts`; only their data source moves.
 
 ### Phase 2 — admin CRUD
 - `src/app/actions/admin-workshop-actions.ts` `[new]` — create / update / publish / archive
@@ -199,11 +257,16 @@ client component. No functions, icons or class instances cross the boundary.
 
 ### Phase 1
 
-**Scope fence.** Phase 1 is items 1–6 below and nothing else. It must not touch
-admin CRUD, poster upload, Blob infrastructure, the `PlatformConfig` migration,
-the coming-soon design, or the calendar toggle. Those are phases 2 and 3. A
-Phase 1 diff containing `admin-workshop-actions.ts`, `features/workshop/storage.ts`
-or `WorkshopComingSoon.tsx` has drifted.
+**Scope fence.** Phase 1 is items 1–6 below plus §8a and nothing else. It must
+not touch admin CRUD, poster upload, Blob infrastructure, the `PlatformConfig`
+migration, the coming-soon design, or the calendar toggle. Those are phases 2
+and 3. A Phase 1 diff containing `admin-workshop-actions.ts`,
+`features/workshop/storage.ts` or `WorkshopComingSoon.tsx` has drifted.
+
+**Stop-and-report rule.** If the port finds an icon name that does not resolve,
+a `resources` shape that does not match, or any field that will not round-trip,
+**stop and report it. Do not silently fix, coerce or correct the source data.**
+A mismatch is a finding, not a chore.
 
 1. Model + additive migration. Nothing existing is altered or dropped.
 2. Seed script ports all 10 events, **ids verbatim**, and sets `archivedAt` on
@@ -230,12 +293,35 @@ or `WorkshopComingSoon.tsx` has drifted.
 4. **Gate before phase 2:** assert every distinct `WorkshopRegistration.eventId`
    matches a `WorkshopEvent.id`. If even one does not, stop — a roster is about
    to detach.
-5. Swap the three read sites to the repository, applying the eligibility rule
-   from §5. With every legacy event archived, the public upcoming surfaces are
-   legitimately empty and must render the TBA / coming-soon state.
+5. Parameterise the seven helpers and rewire all 14 importers (§6 scope
+   correction), applying the eligibility rule from §5. Client components receive
+   plain serialisable rows from a server parent; none of them reads the data
+   itself. With every legacy event archived, the public upcoming surfaces are
+   legitimately empty, and `placeholderSaturdays` fills the calendar with TBA.
 6. Rewrite `getRegistrableEvent` to the §5 rule. Keep its existing
    "soonest single open event" behaviour — that is what stops two open workshops
    filing both rosters under the earlier one.
+
+### Phase 1a — the notification seam (LOCKED path, approved)
+
+`src/features/notification/derive-event-notifications.ts` imports `EVENTS`
+(line 3) and iterates it (line 85). `EVENTS` cannot be retired without it.
+**Manuvrtti has approved this specific change.** The approval is narrow and does
+not carry to anything else.
+
+**Allowed:** replace the workshop data dependency — `EVENTS` → the workshop
+repository read — and make the function async if that requires it.
+
+**Not allowed**, and any of these means stop and report: changing notification
+business logic, categories, recipients, templates, timing or schema; touching
+`NotificationCategory`; refactoring unrelated notification code; widening the
+notification system's scope. Preserve the existing output exactly.
+
+**Proof obligation.** Before and after the swap, run
+`derive-event-notifications` over the *same* workshop data and diff the result.
+The notification decisions and content must be **byte-identical**. Capture both
+runs in the Phase 1 report. A change in output is a failure, not something to
+rationalise — the seam is a data-source swap and nothing else.
 
 ### Phase 2
 7. Actions: `requireAdmin` + Zod + `{ ok, data } | { ok, message }`, each
@@ -299,9 +385,18 @@ against a database with real rows — `migrate deploy` only.
 - every distinct `WorkshopRegistration.eventId` matches a `WorkshopEvent.id`;
 - `WorkshopRegistration.count()` is still **366**.
 
+Plus the two obligations this phase's scope added:
+- **Field round-trip** — every one of the 24 fields survives the port for all
+  ten events (§8 step 3), run while `EVENTS` still exists.
+- **Notification equivalence** — `derive-event-notifications` produces
+  byte-identical output before and after the seam swap (§8a). Both runs go in
+  the report.
+
 Then, on the public site: **none of the ten legacy events appears** on `/workshop`
 or `/workshop/events`, and with nothing published the page shows the TBA /
-coming-soon state rather than a stale countdown or a past workshop. In
+coming-soon state rather than a stale countdown or a past workshop. The calendar
+shows generated "Workshop — TBA" Saturday tiles, and **no TBA tile appears as a
+registerable card** (`openWorkshops` excludes placeholders). In
 `/admin/workshop`, all ten are still listed with their registration counts.
 Build gates: `npm run build`, `npx tsc --noEmit`, `npx eslint` on touched files
 — both `tsc` and the build need `NODE_OPTIONS=--max-old-space-size=8192` here.

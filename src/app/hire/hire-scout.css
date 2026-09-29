@@ -13495,6 +13495,27 @@ a.hire-profile__ext-link:focus-visible {
   margin: 0 0 12px;
 }
 
+/* Markdown lists in the job description (form preview + recruiter job page).
+   Tailwind's preflight strips list markers, so they need restoring here. */
+.hire-jobs-form__preview ol,
+.hire-jobs-detail__body ol {
+  list-style: decimal;
+  margin: 0 0 12px;
+  padding-left: 1.5rem;
+}
+
+.hire-jobs-form__preview ul,
+.hire-jobs-detail__body ul {
+  list-style: disc;
+  margin: 0 0 12px;
+  padding-left: 1.5rem;
+}
+
+.hire-jobs-form__preview li,
+.hire-jobs-detail__body li {
+  margin: 0 0 4px;
+}
+
 .hire-jobs-form__count {
   margin: 0;
   padding: 8px 16px 12px;

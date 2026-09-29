@@ -184,13 +184,15 @@ async function main() {
       assert(skills > 0, "merge filled skills");
     });
 
-    await step("recruiter: in the PROFILE pool, flagged unclaimed, contact locked", async () => {
+    await step("recruiter: in the PROFILE pool, flagged unclaimed, contact unlockable", async () => {
       const refs = await resolveProfileRefs([userId]);
       assert(refs.length === 1, "recruiter-visible");
       publicIdBefore = candidatePublicId(refs[0]!.userId);
       const unclaimed = await repo.listUnclaimedImportUserIds([userId]);
       assert(unclaimed.has(userId), "badge flag");
-      assert(await repo.hasUnclaimedImportForUser(userId), "unlock gate closed");
+      // Plan 164: this no longer gates the unlock — the badge and the claim
+      // path are what still read it.
+      assert(await repo.hasUnclaimedImportForUser(userId), "claimable, and badged as unclaimed");
     });
 
     await step("existing data is never overwritten by a re-merge", async () => {
@@ -239,7 +241,7 @@ async function main() {
       assert(linked?.userId === userId, "Google login linked to the imported user");
       const refs = await resolveProfileRefs([userId]);
       assert(refs.length === 1 && candidatePublicId(refs[0]!.userId) === publicIdBefore, "same recruiter candidate");
-      assert(!(await repo.hasUnclaimedImportForUser(userId)), "contact unlock now possible by policy");
+      assert(!(await repo.hasUnclaimedImportForUser(userId)), "claimed, so no longer badged");
     });
 
     await step("Google claim: a second Google account can never link to the same user", async () => {

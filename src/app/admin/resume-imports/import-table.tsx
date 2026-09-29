@@ -393,8 +393,9 @@ export function ImportTable({
             onChange={(e) => setConsent(e.target.checked)}
           />
           <span>
-            <strong>Consent.</strong> {attestation} Required to register students — registered students
-            are visible to recruiters before they sign in. Contact details stay locked until they do.
+            <strong>Consent.</strong> {attestation} Required to register students — registered
+            students are visible to recruiters before they sign in, and recruiters can unlock
+            their email and phone without waiting for them to sign in.
           </span>
         </label>
         <label className="flex items-center gap-2 text-sm text-[#353535]">

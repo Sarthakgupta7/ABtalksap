@@ -689,15 +689,56 @@ async function main() {
   });
 
   /* ─── T13 ──────────────────────────────────────────────────────────────── */
-  console.log("\nT13 — contact stays locked until claim");
+  console.log("\nT13 — an admin upload is sufficient to unlock (plan 164)");
 
-  await suite("unlock refuses an unclaimed import BEFORE any price lookup or charge", () => {
+  await suite("the unclaimed-import gate is gone from the unlock path", () => {
+    // Plan 154 refused these candidates until they signed in; plan 164
+    // overrode that — an admin importing the résumé is the basis. Asserted so
+    // that anyone reinstating the gate from plan 154's reasoning fails here and
+    // reads plan 164 first.
+    const raw = src("src/features/hire/unlock-transaction.ts");
+    // Comments stripped first: the removal is deliberately EXPLAINED at the
+    // point where the gate used to be, so the old names appear in prose. What
+    // must be gone is the code.
+    const code = raw.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
+    assert(!code.includes("hasUnclaimedImportForUser"), "no unclaimed gate");
+    assert(!code.includes("CANDIDATE_NOT_CLAIMED"), "no such refusal");
+    assert(raw.includes("Plan 164"), "the removal is explained where it was");
+  });
+
+  await suite("claiming still depends on hasUnclaimedImportForUser", () => {
+    // The function was only ever removed from ONE caller. claim.ts uses it to
+    // decide whether a Google sign-in may claim the account, and losing that
+    // would stop imported candidates ever claiming their own profile.
+    assert(
+      src("src/features/resume/import/claim.ts").includes("hasUnclaimedImportForUser"),
+      "claim path intact",
+    );
+    assert(
+      src("src/repositories/resume-import.ts").includes("export async function hasUnclaimedImportForUser"),
+      "the function still exists",
+    );
+  });
+
+  await suite("a refused unlock still costs nothing", () => {
+    // The gate is gone; the ordering guarantee it relied on is not.
     const s = src("src/features/hire/unlock-transaction.ts");
-    const gate = s.indexOf("await hasUnclaimedImportForUser(candidateUserId)");
-    const price = s.indexOf("await getIntConfig(CONTACT_UNLOCK_COST_KEY)");
     const charge = s.indexOf("applyCreditChange(tx");
-    assert(gate > 0 && gate < price && gate < charge, "order");
-    assert(s.includes('reason: "CANDIDATE_NOT_CLAIMED"'), "refusal reason");
+    for (const reason of ["INSUFFICIENT_CREDITS", "UNAVAILABLE"]) {
+      const at = s.indexOf(`REFUSAL_MESSAGE.${reason}`);
+      if (at < 0) continue;
+      assert(at < charge || s.indexOf(`reason: "${reason}"`) < charge, `${reason} decided before the charge`);
+    }
+    assert(charge > 0, "the charge still happens inside the transaction");
+  });
+
+  await suite("the recruiter is still told the data is unconfirmed", () => {
+    // Unlocking is now allowed, so the badge is the only thing telling a
+    // recruiter they are buying contact details attached to unverified résumé
+    // data. Removing it would be a second, worse change.
+    const card = src("src/components/hire/match-card.tsx");
+    assert(card.includes("importedUnclaimed"), "badge flag still read");
+    assert(card.includes("not yet claimed"), "badge still rendered");
   });
 
   /* ─── T14–T18 ──────────────────────────────────────────────────────────── */

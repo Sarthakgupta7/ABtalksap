@@ -45,6 +45,7 @@
 - 2026-08-10 — `/` now renders the landing hub for signed-in users too (no more redirect to /dashboard); track cards show "Open dashboard" per-track via `features/landing/get-landing-state.ts`; `/login` bounces signed-in users to `/` instead of `/dashboard`.
 
 ## Pending reconcile
+- 2026-09-29 [data|rule] Script `db:topup:recruiter-credits-20k` tops live recruiter workspaces to $20,000 via idempotent ADMIN_ADJUSTMENT (align with new starting grant); Neon child first
 - 2026-09-29 [rule] New recruiter starting grant `credits.starting_grant_minor` default $200 → $20,000 (2_000_000 cents); existing balances unchanged; PlatformConfig row override still wins if present
 - 2026-09-28 [schema] Production P3009 recovery for `20260925130000_resume_import`: ResumeImport, ResumeParseUsage, and CandidateProfile.reviewPendingSince are applied; `Account_one_google_per_user` was not created because 109 students already have two different Google logins
 - 2026-09-28 [feature] LangChain & LangGraph Cohort at /program/langchain (flag ENABLE_LANGCHAIN, LearningProgram `langchain`, cohort `langchain-open`, activities `act_lcg_day_*`, 31 days / 372 pts, no videos): file-for-file clone of the 31-day Databricks track, content in prisma/content/langchain-langgraph-cohort, seed `npm run db:seed:langchain`; `/program/langchain` is a public exact-match landing, day routes stay session-gated

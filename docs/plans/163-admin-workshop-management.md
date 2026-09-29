@@ -751,3 +751,215 @@ Every phase: `npx tsc --noEmit`, `npx eslint` on touched files, `npm run build`
 — all three need `NODE_OPTIONS=--max-old-space-size=8192` on this machine. Lint
 baseline is 1 pre-existing error in `EventsCalendar.tsx` (`setState` in an
 effect, present on master); do not let it grow.
+
+## 15. Phase 2 — admin workshop management
+
+Same branch, `feat/admin-workshop-management`. Folds into
+`docs/plans/163-admin-workshop-management.md` §14 on approval.
+**Nothing here redoes 1a (`fe73cc5e`), 1b (`a39c272e`) or 1c (`3a9e9aa2`).**
+
+## Context
+
+The schedule is in the database and the public page is honest: with nothing
+published, `/workshop` shows Coming Soon and the calendar. But an admin still
+cannot create a workshop — `/admin/workshop` has only Registrations and
+Analytics. This phase closes that: create → draft → publish → edit → unpublish
+→ archive, all from the console, no deploy.
+
+**Verified before starting:** the Coming Soon screen's "Past sessions" link
+opens `/workshop/events`, and none of the ten archived workshop titles appear
+there. The only "LinkedIn"/"Hackathon" matches in that page are the footer's
+social icon and the sidebar nav item. No change needed; the link stays.
+
+## Scope fence
+
+Phase 2 is the Events tab and the lifecycle. **Not** in scope: poster upload,
+`PlatformConfig` keys, the calendar visibility toggle, retiring Supabase. Those
+are Phase 3. A Phase 2 diff containing `features/workshop/storage.ts` or
+`platform-config.ts` has drifted.
+
+## The four controls, and which one this phase builds
+
+```
+Workshop
+├── lifecycle : DRAFT / PUBLISHED / ARCHIVED   <- Phase 2
+├── poster    : present / absent               <- Phase 3
+├── calendar  : visible / hidden               <- Phase 3
+└── page mode : LIVE / COMING_SOON             <- Phase 3 (override); derived rule already live
+```
+
+Keep them independent. Publishing must not touch a poster; archiving must not
+clear one.
+
+## Files to touch
+
+- `src/repositories/workshop.ts` `[edit]` — write functions beside the existing
+  reads: `createEvent`, `updateEvent`, `setLifecycle`, `deleteEventIfEmpty`,
+  `countRegistrations`.
+- `src/app/actions/admin-workshop-actions.ts` `[new]` — the Server Actions.
+- `src/components/admin/workshop-event-form.tsx` `[new]` (client) — create/edit.
+- `src/components/admin/workshop-events-table.tsx` `[new]` (client) — the list,
+  with lifecycle buttons per row.
+- `src/app/admin/workshop/page.tsx` `[edit]` — a third `TABS` entry, `events`,
+  rendering an `EventsTab` beside the existing `RegistrationsTab` /
+  `AnalyticsTab`. The tab already lives in the URL; follow that pattern.
+- `src/lib/validations/workshop.ts` `[new]` — the Zod schema, shared by the
+  action and the form so both agree on the rules.
+
+## Server vs Client
+
+| Component | Kind |
+|---|---|
+| `/admin/workshop` page, `EventsTab` | Server — reads via `listAllEvents()` |
+| `workshop-events-table`, `workshop-event-form` | Client — forms, dialogs, pending state |
+
+The table receives plain rows. `iconName` travels as a string and is rendered
+with `WorkshopIcon`; never pass a component (the 1b lesson).
+
+## Steps
+
+### 1. Repository writes
+
+`createEvent` takes the already-validated fields plus the derived id, and
+**fails on a duplicate id** — let the unique constraint raise rather than
+checking first, then translate it, so two admins racing cannot both pass a
+pre-check. `deleteEventIfEmpty` counts registrations and deletes **in one
+transaction**, returning a discriminated result so the caller can tell "deleted"
+from "refused, N registrations" without a second read.
+
+### 2. Validation — `src/lib/validations/workshop.ts`
+
+Mirrors the columns: `title`, `description`, `host`, `location`, `tag`,
+`accent` (hex), `iconName` (must be one of `knownIconNames()`), `track`,
+`timeLabel`, `date` (`YYYY-MM-DD`), plus optional `externalHref` (URL),
+`ctaLabel`, `youtubeId`, `duration`, `durationMinutes`, `titleAccents`,
+`takeaways`, `topics`, `resources`.
+
+**The id is derived from the creation date once, then immutable forever.**
+`workshop-${date}` from the `YYYY-MM-DD` string **as typed** — no `Date`
+round-trip, which is what shifts a date across a timezone boundary. The stored
+`date` column uses `new Date(\`${iso}T00:00:00Z\`)`, the port's convention.
+
+After creation the id is not "derived from the date" at all — it is the roster
+key. **Editing the workshop's date updates only the `date` column and never
+regenerates the id**, so a session moved from the 10th to the 17th keeps its
+registrations. Saying it any other way invites someone to "keep them in sync".
+
+**`registrationOpen` is an editable boolean on the form**, independent of
+lifecycle. Publishing an event with it false is allowed — the eligibility rule
+then correctly keeps it out of the public experience — but the admin UI must
+say so plainly ("Published · registration closed — not publicly visible"),
+because otherwise publishing looks like it silently failed.
+
+`iconName` validated against `knownIconNames()` so an unknown name cannot be
+saved — the guard that makes the blank-card failure impossible rather than
+merely unlikely.
+
+### 3. Actions — `src/app/actions/admin-workshop-actions.ts`
+
+`requireAdmin` first, Zod second, `{ ok, data } | { ok, message }` out, one
+`writeAudit` row per mutation inside the same transaction as the write.
+
+**Deletion's audit row must outlive the event.** `AdminAction` stores
+`entityType` / `entityId` as plain strings with no foreign key, so the row
+survives — but the *contents* must not depend on reading the event back. Copy
+the id, the title and the reason into the audit row's `previousState` before
+the delete, in the same transaction. An audit trail that loses the name of what
+was deleted is not an audit trail.
+
+| Action | Notes |
+|---|---|
+| `createWorkshopAction` | derived id; a collision returns "A workshop already exists on that date" rather than overwriting |
+| `updateWorkshopAction` | id immutable; changing the date does **not** re-derive it |
+| `publishWorkshopAction` / `unpublishWorkshopAction` | sets/clears `publishedAt` |
+| `archiveWorkshopAction` / `unarchiveWorkshopAction` | sets/clears `archivedAt` |
+| `deleteWorkshopAction` | only at zero registrations; refuses otherwise with the count |
+
+Each calls `revalidatePath("/admin/workshop")` and `revalidatePath("/workshop")`
+— the public page is a Server Component reading the same table, so a publish
+must be visible without a deploy, which is the whole point of the phase.
+
+### 4. UI
+
+**Table** lists every event, newest first, with title, date, track, lifecycle
+badge (Draft / Published / Archived) and registration count. The ten legacy
+events appear here, archived, with their counts — that is the "preserved and
+admin-visible" requirement.
+
+**Delete vs Archive must look different.** A row with registrations shows
+**Archive** only, and says why Delete is unavailable ("250 registrations —
+archive instead"). A row with none shows **Delete**. Never one button that
+silently picks. Both go through `AccountOpsDialog`'s reason-plus-confirm shape,
+the house style for consequential admin writes.
+
+**Form** is one component for create and edit; on edit the id is shown
+read-only with a note that it is the roster key. Date changes do not move it.
+
+## Guardrails (DO NOT)
+
+- **Never let the id be typed, edited, or re-derived after creation.** It is the
+  roster key for 366 rows.
+- **Never upsert on create.** A collision is an error, not a merge.
+- **Do not hard-delete an event with registrations**, and do not offer the
+  button.
+- Do not derive the id via a `Date` object — string in, string out.
+- Do not touch poster, config or calendar-visibility code; Phase 3.
+- Do not alter the public eligibility rule or `placeholderSaturdays`.
+- Do not modify the 1a migration, the seed, `prisma/content/workshop-events.json`
+  or the read path in `src/repositories/workshop.ts` unless a concrete defect is
+  found — report it instead.
+- Do not touch notifications beyond the seam already shipped in 1b.
+- Server Actions not route handlers; `select` on every query; `lib/logger.ts`
+  never `console`; `buttonVariants` on `<Link>`.
+
+## Verification
+
+**The lifecycle, end to end:**
+
+The test event must be **future-dated, `registrationOpen = true`, not
+archived** — otherwise publishing correctly leaves the page on Coming Soon and
+the test looks like a failure when the rule is working.
+
+```
+create → derived id shown, saved as DRAFT
+       → /workshop still Coming Soon          (not public while unpublished)
+publish → /workshop shows the full experience  (hero, topics, countdown, CTA)
+edit    → change the title; public page follows, id unchanged
+unpublish → /workshop back to Coming Soon
+archive → stays listed in admin, absent from public
+```
+
+**The delete/archive rules:**
+
+| Case | Expect |
+|---|---|
+| `linkedin-ai-interview` (250 registrations) | Delete unavailable; Archive offered with the count |
+| a fresh event, no registrations | Delete works |
+| the ten legacy events | still listed in admin, archived, counts intact |
+| after all of it | `verify-workshop-events-port.ts` all-pass, **366** registrations |
+
+**Authorisation:** a non-admin gets redirected from `/admin/workshop`, and every
+action refuses. **Audit:** each mutation leaves an `AdminAction` row naming the
+actor, the event and the reason.
+
+**Id rules:** creating a second workshop on a date that already has one is
+refused with a clear message, not an overwrite. A date near midnight still
+derives the id for the day the admin picked.
+
+Build gates each step: `npx tsc --noEmit`, `npx eslint` on touched files,
+`npm run build` — all with `NODE_OPTIONS=--max-old-space-size=8192`. Lint
+baseline is the 1 pre-existing `EventsCalendar.tsx` error; do not let it grow.
+
+**Browser verification runs the lifecycle twice — as admin, and as a logged-out
+visitor.** The point of the feature is that a public visitor sees
+database-driven state, and only the logged-out pass proves that:
+
+| Admin does | Logged-out `/workshop` shows |
+|---|---|
+| create (draft) | Coming Soon |
+| publish | the real workshop |
+| edit the title | the new title |
+| unpublish | Coming Soon |
+| archive | Coming Soon, and it stays listed in admin |
+
+**Do not raise the PR at the end of Phase 2.** That browser pass comes first.

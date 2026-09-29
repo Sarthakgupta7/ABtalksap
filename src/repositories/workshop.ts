@@ -150,3 +150,133 @@ export async function getEventTitles(
   });
   return new Map(rows.map((r) => [r.id, r.title]));
 }
+
+/* ── Writes (plan 163 phase 2) ───────────────────────────────────────────── */
+
+/** Registrations attached to an event. The roster's size, by its key. */
+export async function countRegistrations(eventId: string): Promise<number> {
+  return prisma.workshopRegistration.count({ where: { eventId } });
+}
+
+/** One event as the admin console sees it: every field, whatever its state. */
+export async function getEventForAdmin(id: string) {
+  return prisma.workshopEvent.findUnique({
+    where: { id },
+    select: { ...SELECT, publishedAt: true, archivedAt: true },
+  });
+}
+
+/** Every event with its roster size, newest first. Admin console only. */
+export async function listEventsForAdmin() {
+  const [rows, counts] = await Promise.all([
+    prisma.workshopEvent.findMany({
+      orderBy: { date: "desc" },
+      select: {
+        id: true,
+        date: true,
+        title: true,
+        track: true,
+        registrationOpen: true,
+        posterUrl: true,
+        publishedAt: true,
+        archivedAt: true,
+      },
+    }),
+    prisma.workshopRegistration.groupBy({
+      by: ["eventId"],
+      _count: { _all: true },
+    }),
+  ]);
+  const byEvent = new Map(counts.map((c) => [c.eventId, c._count._all]));
+  return rows.map((r) => ({ ...r, registrations: byEvent.get(r.id) ?? 0 }));
+}
+
+export type WorkshopWriteFields = Omit<
+  Prisma.WorkshopEventUncheckedCreateInput,
+  "id" | "createdAt" | "updatedAt" | "publishedAt" | "archivedAt"
+>;
+
+/**
+ * Create, failing on a duplicate id.
+ *
+ * The unique constraint decides, rather than a `findUnique` first: two admins
+ * creating the same date at the same moment would both pass a pre-check and
+ * the second would overwrite the first, merging two rosters under one id —
+ * the failure `events-data.ts` warns about. P2002 is translated by the caller.
+ */
+export async function createEvent(id: string, data: WorkshopWriteFields) {
+  return prisma.workshopEvent.create({
+    data: { ...data, id, publishedAt: null, archivedAt: null },
+    select: { id: true },
+  });
+}
+
+/**
+ * Update the editable fields.
+ *
+ * `id` is not among them and never will be: it is the roster key. A date edit
+ * moves the `date` column only, leaving the id — and therefore the
+ * registrations — where they are.
+ */
+export async function updateEvent(id: string, data: WorkshopWriteFields) {
+  return prisma.workshopEvent.update({
+    where: { id },
+    data,
+    select: { id: true },
+  });
+}
+
+/** Lifecycle only. Never touches the poster or any content field. */
+export async function setLifecycle(
+  id: string,
+  patch: { publishedAt?: Date | null; archivedAt?: Date | null },
+) {
+  return prisma.workshopEvent.update({
+    where: { id },
+    data: patch,
+    select: { id: true, publishedAt: true, archivedAt: true },
+  });
+}
+
+export type DeleteOutcome =
+  | { ok: true }
+  | { ok: false; reason: "has-registrations"; registrations: number }
+  | { ok: false; reason: "not-found" };
+
+/**
+ * Delete, but only with an empty roster.
+ *
+ * Counted and deleted in ONE transaction: checking first and deleting after
+ * leaves a window in which a signup lands and is destroyed with the event.
+ * Anything with registrations is archived instead — that is the caller's job
+ * to offer, and this refuses rather than deciding for them.
+ */
+export async function deleteEventIfEmpty(
+  id: string,
+  /**
+   * Runs inside the same transaction, after the roster check passes and before
+   * the row goes. This is where the audit row is written: written outside, a
+   * failed delete would leave a record saying the workshop was deleted when it
+   * still exists. Here, a failure rolls both back together.
+   */
+  onBeforeDelete?: (tx: Prisma.TransactionClient) => Promise<void>,
+): Promise<DeleteOutcome> {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.workshopEvent.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!existing) return { ok: false, reason: "not-found" } as const;
+
+    const registrations = await tx.workshopRegistration.count({
+      where: { eventId: id },
+    });
+    if (registrations > 0) {
+      return { ok: false, reason: "has-registrations", registrations } as const;
+    }
+
+    await onBeforeDelete?.(tx);
+    await tx.workshopEvent.delete({ where: { id }, select: { id: true } });
+    return { ok: true } as const;
+  });
+}

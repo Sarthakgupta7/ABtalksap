@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { requireAdmin } from "@/lib/admin-auth";
+import { HackathonMasterFilters } from "@/components/admin/hackathon-master-filters";
 import { VideothonExportButton } from "@/components/admin/videothon-export-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -16,6 +18,7 @@ import { VIDEOTHON } from "@/features/hackathon-video/config";
 import {
   getAdminVideoRegistrations,
   parseVideoRegistrationQuery,
+  parseVideoRegistrationUserType,
 } from "@/features/hackathon-video/get-admin-registrations";
 import { cn } from "@/lib/utils";
 
@@ -30,15 +33,18 @@ const dateFmt = new Intl.DateTimeFormat("en-IN", {
 export default async function AdminVideothonParticipantsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; cohort?: string }>;
 }) {
   await requireAdmin();
   const sp = await searchParams;
   const q = parseVideoRegistrationQuery(sp.q);
-  const data = await getAdminVideoRegistrations({ q });
+  const userType = parseVideoRegistrationUserType(sp.cohort);
+  const data = await getAdminVideoRegistrations({ q, userType });
 
   const stats = [
     { label: "Registered", value: data.total },
+    { label: "New to ABTalks", value: data.newUserCount },
+    { label: "Existing users", value: data.existingUserCount },
     { label: "Learners", value: data.learnerCount },
     { label: "Working", value: data.workingCount },
     { label: "Submitted", value: data.submittedCount },
@@ -66,7 +72,7 @@ export default async function AdminVideothonParticipantsPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         {stats.map((s) => (
           <div key={s.label} className="rounded-xl border bg-card p-4">
             <p className="text-xs text-muted-foreground">{s.label}</p>
@@ -75,7 +81,20 @@ export default async function AdminVideothonParticipantsPage({
         ))}
       </div>
 
+      <div className="space-y-2">
+        <Suspense fallback={null}>
+          <HackathonMasterFilters />
+        </Suspense>
+        <p className="text-xs text-muted-foreground">
+          NEW = ABTalks account created within 24 hours before registering for{" "}
+          {VIDEOTHON.name} (joined for it). OLD = account already existed.
+        </p>
+      </div>
+
       <form className="flex max-w-md gap-2" action="/admin/hackathon/videothon">
+        {userType !== "all" ? (
+          <input type="hidden" name="cohort" value={userType} />
+        ) : null}
         <Input
           name="q"
           defaultValue={q ?? ""}
@@ -86,7 +105,11 @@ export default async function AdminVideothonParticipantsPage({
         </button>
         {q ? (
           <Link
-            href="/admin/hackathon/videothon"
+            href={
+              userType === "all"
+                ? "/admin/hackathon/videothon"
+                : `/admin/hackathon/videothon?cohort=${userType}`
+            }
             className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-9")}
           >
             Clear
@@ -96,7 +119,11 @@ export default async function AdminVideothonParticipantsPage({
 
       {data.rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {q ? `No participants match “${q}”.` : "No registrations yet."}
+          {q
+            ? `No participants match “${q}”.`
+            : userType !== "all"
+              ? `No ${userType.toUpperCase()} participants.`
+              : "No registrations yet."}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border">
@@ -104,6 +131,7 @@ export default async function AdminVideothonParticipantsPage({
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>User</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>City</TableHead>
@@ -122,6 +150,14 @@ export default async function AdminVideothonParticipantsPage({
                     <Link href={`/admin/students/${r.userId}`} className="hover:underline">
                       {r.fullName}
                     </Link>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={r.isNewUser ? "default" : "outline"}
+                      title={`Account created ${dateFmt.format(new Date(r.accountCreatedAtIso))}`}
+                    >
+                      {r.isNewUser ? "NEW" : "OLD"}
+                    </Badge>
                   </TableCell>
                   <TableCell>{r.email}</TableCell>
                   <TableCell className="whitespace-nowrap">{r.phone}</TableCell>

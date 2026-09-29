@@ -79,6 +79,14 @@ export async function sendEmail(opts: {
    */
   headers?: Record<string, string>;
   /**
+   * Defaults to true (unchanged behaviour). Pass `false` for one-to-one
+   * transactional mail — application updates, account events — to omit the
+   * `Precedence: bulk` header. That header tells Gmail the message is a mass
+   * mailing and pushes it toward the Promotions tab; personal updates belong
+   * in Primary / Updates.
+   */
+  bulk?: boolean;
+  /**
    * Plan 152: Brevo tags for dashboard filtering. Defaulted to `[kind]` so
    * every send is filterable in Brevo's Statistics tab by message type.
    */
@@ -136,7 +144,7 @@ export async function sendEmail(opts: {
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       "X-Entity-Ref-ID": deliveryId,
       "X-Mailer": "ABTalks",
-      Precedence: "bulk",
+      ...(opts.bulk === false ? {} : { Precedence: "bulk" }),
     };
     const mergedHeaders = { ...defaultHeaders, ...(opts.headers ?? {}) };
     const tags = opts.tags ?? [kind];

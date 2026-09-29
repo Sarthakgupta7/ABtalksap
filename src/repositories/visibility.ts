@@ -228,24 +228,65 @@ export async function applyVisibilityChange(
     input.kind === "usable_profile" ||
     input.kind === "admin_import"
   ) {
-    if (existing) {
-      return {
-        ok: true,
-        searchableByRecruiters: existing.searchableByRecruiters,
-        withdrawnAt: existing.withdrawnAt,
-        created: false,
-        updated: false,
-        skipped: true,
-        skipReason: "already_exists",
-        mirrorFailed: false,
-      };
-    }
     const consentSource =
       input.kind === "usable_profile"
         ? PROFILE_DEFAULT_CONSENT_SOURCE
         : input.kind === "admin_import"
           ? ADMIN_IMPORT_CONSENT_SOURCE
           : ENROLLMENT_DEFAULT_CONSENT_SOURCE;
+
+    if (existing) {
+      // These three intents MEAN "this person is discoverable". Refusing to act
+      // on an existing row was create-only for a good reason — a row usually
+      // records a decision and must not be overwritten — but it left one
+      // population permanently unreachable.
+      //
+      // `migrate-2b-visibility` wrote 12,734 rows on 2026-08-24 as
+      // `{ searchableByRecruiters: false, consentSource: null }`, when the
+      // column still defaulted to false. The default was corrected 52 minutes
+      // later by a migration that deliberately did not rewrite existing rows,
+      // and nothing has re-opened them since: an admin résumé import for any
+      // user who pre-dates that window silently answered "already_exists".
+      //
+      // A null `consentSource` is the signature of that artifact and of nothing
+      // else — every real decision stamps one. So a closed, never-decided row
+      // is healed here; anything carrying a decision is still left exactly as
+      // it is. A withdrawn row cannot reach this line: the `withdrawnAt` guard
+      // above returns first, which is what keeps admin moderation durable.
+      // See plan 161 §2c.
+      const neverDecided =
+        existing.consentSource === null && !existing.searchableByRecruiters;
+      if (!neverDecided) {
+        return {
+          ok: true,
+          searchableByRecruiters: existing.searchableByRecruiters,
+          withdrawnAt: existing.withdrawnAt,
+          created: false,
+          updated: false,
+          skipped: true,
+          skipReason: "already_exists",
+          mirrorFailed: false,
+        };
+      }
+      await tx.candidateVisibility.update({
+        where: { userId: input.userId },
+        data: {
+          searchableByRecruiters: true,
+          consentSource,
+          consentedAt: now,
+        },
+      });
+      const healedMirror = await flushMirror(tx, input);
+      return {
+        ok: true,
+        searchableByRecruiters: true,
+        withdrawnAt: null,
+        created: false,
+        updated: true,
+        skipped: false,
+        mirrorFailed: healedMirror,
+      };
+    }
     await tx.candidateVisibility.create({
       data: {
         userId: input.userId,

@@ -3,9 +3,13 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { isEmailLoginEnabled } from "@/lib/feature-flags";
 import { requireRecruiter } from "@/lib/program-auth";
+import { requireRecruiterWorkspace } from "@/features/recruiter-workspace/workspace";
+import { blockingPurchasedBalanceMinor } from "@/features/hire/delete-recruiter-account";
 import { cn } from "@/lib/utils";
+import { isCompanyLogoStorageConfigured } from "@/features/hire/org-logo-storage";
 import { getRecruiterProfileAction } from "@/app/actions/recruiter-profile-actions";
 import { RecruiterProfileForm } from "@/components/hire/recruiter-profile-form";
+import { DeleteRecruiterAccountDialog } from "@/components/hire/delete-recruiter-account-dialog";
 
 export const metadata: Metadata = {
   title: "Settings | ABTalks Hire",
@@ -20,6 +24,10 @@ export const metadata: Metadata = {
 export default async function HireSettingsPage() {
   await requireRecruiter();
   const res = await getRecruiterProfileAction();
+  const workspace = await requireRecruiterWorkspace();
+  const purchasedBalanceMinor = workspace.ok
+    ? await blockingPurchasedBalanceMinor(workspace.data.organizationId)
+    : 0;
 
   if (!res.ok) {
     return (
@@ -54,7 +62,10 @@ export default async function HireSettingsPage() {
         </p>
       </div>
 
-      <RecruiterProfileForm initialData={res.data} />
+      <RecruiterProfileForm
+        initialData={res.data}
+        logoUploadAvailable={isCompanyLogoStorageConfigured()}
+      />
 
       {isEmailLoginEnabled() ? (
         <section className="rounded-xl border bg-card p-5">
@@ -72,6 +83,21 @@ export default async function HireSettingsPage() {
           </Link>
         </section>
       ) : null}
+
+      <section className="rounded-xl border border-destructive/30 bg-destructive/5 p-5">
+        <h2 className="font-heading text-base font-semibold text-foreground">
+          Danger zone
+        </h2>
+        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+          Deleting your account removes your projects, searches, shortlists,
+          outreach and assessments, and cannot be undone.
+        </p>
+        <div className="mt-3">
+          <DeleteRecruiterAccountDialog
+            purchasedBalanceMinor={purchasedBalanceMinor}
+          />
+        </div>
+      </section>
     </div>
   );
 }

@@ -16147,3 +16147,130 @@ a.hire-credits:hover { border-color: var(--h-primary); }
     box-shadow: none;
   }
 }
+
+/* ── Search results pager (plan 158) ───────────────────────────────────────
+   Numbered paging under the results list. Shared by the desk, the full-list
+   /hire/[requestId]/candidates page and the signed-out /hire/matches preview —
+   this sheet is imported by /hire/layout.tsx, so all three get it.
+
+   Colours come from the --h-* tokens above, NOT from --primary/--border: those
+   hold bare HSL triplets ("188 94% 19%") for Tailwind's hsl(var(--x)) wrapper,
+   so a plain var(--border) is an invalid value and silently drops the rule.
+   The --h-* set is hex and already flips under html.dark. */
+.scout-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.scout-pager__n,
+.scout-pager__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--h-border);
+  border-radius: 10px;
+  background: var(--h-surface);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--h-ink);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.scout-pager__n:hover:not(.is-current),
+.scout-pager__step:hover:not(:disabled) {
+  border-color: var(--h-primary);
+  background: var(--h-peach-wash);
+  color: var(--h-primary);
+}
+
+.scout-pager__n:focus-visible,
+.scout-pager__step:focus-visible {
+  outline: 2px solid var(--h-primary);
+  outline-offset: 2px;
+}
+
+.scout-pager__n.is-current {
+  border-color: var(--h-primary);
+  background: var(--h-primary);
+  color: #ffffff;
+  cursor: default;
+}
+
+.scout-pager__step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.scout-pager__gap {
+  min-width: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--h-gray-500);
+  user-select: none;
+}
+
+.scout-pager__count {
+  margin-inline-start: auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--h-gray-600);
+}
+
+/* Narrow screens: the count drops to its own line so the numbers never wrap
+   mid-run or push the page off-canvas. */
+@media (max-width: 520px) {
+  .scout-pager__count {
+    flex-basis: 100%;
+    margin-inline-start: 0;
+    padding-top: 4px;
+  }
+}
+
+/* ── Company logo control, /hire/settings (plan 158) ───────────────────────
+   The tile sits on a neutral fill rather than the card background so a white
+   or light logo is still visible in dark mode, and the image is contained
+   rather than cropped — a logo is rarely square. Same token note as above. */
+.hire-logo {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.hire-logo__tile {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  padding: 8px;
+  border: 1px solid var(--h-border);
+  border-radius: 14px;
+  background: var(--h-pill);
+  overflow: hidden;
+}
+
+.hire-logo__img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.hire-logo__meta {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+}

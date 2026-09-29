@@ -1,0 +1,288 @@
+# 163 — Admin-run workshops, end to end
+
+## 1. Goal
+
+Let an admin run the entire workshop surface from the admin console — add and
+remove workshops, attach a poster, show or hide the calendar, and put the public
+page into a dedicated "coming soon" state — with no code change and no deploy.
+The ten existing workshops are preserved as historical records with their
+rosters intact, but the public experience starts fresh.
+
+## 2. Current behavior
+
+Running a workshop today requires a developer.
+
+| Piece | Where it lives | Admin can change it? |
+|---|---|---|
+| The 10 workshops/events | `src/components/workshop/events-data.ts` — a hardcoded `EVENTS: WorkshopEvent[]`, 630 lines | **No** — code + deploy |
+| Registrations (366 rows) | Neon/Prisma `WorkshopRegistration`, keyed by free-form `eventId` string | Read-only view |
+| Zoom link, WhatsApp link, webinar date/time, countdown target | **Supabase** `workshop_config`, "a single hand-edited row" | Only by editing Supabase directly |
+| `/admin/workshop` | Registrations + Analytics tabs | No event CRUD at all |
+| Public `/workshop` | Hero, topics, stats, calendar, registration modal | — |
+| Public `/workshop/events` | Timeline; renders `ComingSoonCard` when it runs out | — |
+
+Four facts shape everything below:
+
+1. **`WorkshopEvent.Icon` is a `LucideIcon`** — a React component reference. It
+   cannot be stored in a database, and this repo forbids passing icons across
+   the Server→Client boundary. The DB stores an icon *name*; a client-side map
+   turns it back into a component.
+2. **`eventId` is the roster join key and it is free-form text.** 366 rows point
+   at three ids (`linkedin-ai-interview` 250, `workshop-2026-09-05` 95,
+   `workshop-2026-09-12` 21). `events-data.ts` already warns that reusing an id
+   "would silently merge two workshops' rosters". The port must preserve ids
+   exactly.
+3. **The workshop track spans two databases.** Registrations in Neon, config in
+   Supabase. That split is why no admin screen can own the config today.
+4. **All ten events are already in the past** — dated 2026-06-01 through
+   2026-09-26, against a current date of 2026-09-29. Archiving them hides
+   nothing that was still upcoming, which is what makes the fresh-start
+   decision below low-risk.
+
+## 3. Point of view
+
+- **The real bug is not "no admin UI", it is that the schedule is source code.**
+  Every other symptom follows. Fix the source of truth and the admin screen
+  becomes ordinary CRUD.
+- **Kill the Supabase dependency as part of this.** A second database holding
+  five fields, hand-edited, outside the audit log, is the worst thing in this
+  feature. `PlatformConfig` and `src/lib/platform-config.ts` already exist, are
+  typed and audited, and have an admin panel at `/admin/settings`. Moving five
+  values there deletes an external dependency and makes them console-editable
+  for free. Do it once; do not build on Supabase and migrate later.
+- **"Remove the landing page" should be a state, not a deletion.** Deleting
+  loses SEO, backlinks and the archive. A `mode` of `LIVE` / `COMING_SOON` gives
+  the same outcome, is reversible in one click, and cannot leave a dead route.
+- **Historical data is not the public schedule.** The ten legacy events are kept
+  for their rosters and for the record, and are invisible to the public. The new
+  schedule starts empty and shows TBA until an admin publishes something.
+- **Do not let an admin type the event id.** It is the roster key. Derive it
+  from the date (`workshop-YYYY-MM-DD`, the convention already documented in the
+  file), make it immutable after creation, and never render it as an input. A
+  typo here silently splits or merges rosters and is not recoverable from the UI.
+- **Posters need their own public blob store.** The existing store (`resume2_*`)
+  is private by design because résumés carry personal data. Posters must be
+  readable logged-out. Add a separate public store; do not relax the résumé
+  store's privacy to reuse it.
+
+## 4. Decisions locked
+
+- **Phased**: three mergeable phases, one plan.
+- **Poster**: upload to a **public** Vercel Blob store; the event row stores the URL.
+- **Coming soon**: the **whole `/workshop` page** becomes a dedicated screen.
+- **Existing events**: all 10 are ported into the DB with **ids and registration
+  relationships preserved**. They are **historical/archived records only and are
+  excluded from the new public workshop experience.** `events-data.ts` is
+  retired as a data source.
+
+## 5. Data model
+
+```prisma
+model WorkshopEvent {
+  /// The roster key. Derived from the date as `workshop-YYYY-MM-DD` and NEVER
+  /// editable afterwards: WorkshopRegistration.eventId points here by string,
+  /// and changing it detaches the roster. The legacy ids
+  /// (`linkedin-ai-interview`, `ai-workshop-live`, `uiux-ai-workshop`, …) are
+  /// carried over verbatim and do not follow the convention.
+  id               String   @id
+  date             DateTime
+  timeLabel        String
+  title            String
+  description      String
+  host             String
+  location         String
+  tag              String
+  accent           String
+  /// A lucide icon NAME, not a component — a component cannot be stored, nor
+  /// crossed over the Server→Client boundary.
+  iconName         String
+  track            WorkshopTrack
+  posterUrl        String?
+  registrationOpen Boolean  @default(true)
+  externalHref     String?
+  ctaLabel         String?
+  /// Null until an admin publishes. Nothing unpublished is ever public.
+  publishedAt      DateTime?
+  /// Set on all ten legacy events by the port. Archived rows keep their
+  /// registrations and stay visible in the admin console, and are excluded
+  /// from every public surface.
+  archivedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([date(sort: Desc)])
+  @@index([publishedAt, archivedAt, date])
+}
+```
+
+`resources` (past-workshop links) is a small `{label, href, kind}[]` — a `Json`
+column is proportionate; do not build a second table.
+
+**Lifecycle.** Public eligibility is a single rule, and every public read uses it:
+
+```
+eligible = publishedAt != null
+       AND archivedAt == null
+       AND registrationOpen
+       AND date is upcoming
+```
+
+Legacy registrations keep working against their original `eventId` strings
+regardless — the roster lookup is by id and does not consult this rule.
+
+**No foreign key** from `WorkshopRegistration.eventId` to `WorkshopEvent.id` in
+phase 1. Adding one is a constraint against 366 existing rows and would fail on
+any mismatch. Verify the match first; consider the FK later as its own step.
+
+New `PLATFORM_CONFIG_KEYS` entries, reusing the existing registry:
+`workshop.mode` (`LIVE` | `COMING_SOON`), `workshop.calendar_visible`,
+`workshop.zoom_link`, `workshop.whatsapp_link`, `workshop.coming_soon_message`.
+
+## 6. Files to touch
+
+### Phase 1 — database becomes the source of truth
+- `prisma/schema.prisma` `[edit]` — `WorkshopEvent` + `WorkshopTrack` enum
+- `prisma/migrations/<ts>_workshop_events_table/migration.sql` `[new]` — additive only
+- `prisma/scripts/seed-workshop-events.ts` `[new]` — one-time port of the 10 events, ids preserved, **`archivedAt` set on every one**
+- `src/repositories/workshop.ts` `[new]` — the read/write boundary
+- `src/components/workshop/events-data.ts` `[edit]` — keep the type, the `monthAbbr` / `dayNum` helpers and the icon-name→component map; **delete the `EVENTS` array**
+- `src/app/workshop/page.tsx`, `src/app/workshop/events/page.tsx`, `src/app/admin/workshop/page.tsx` `[edit]` — read from the repository
+- `.github/CODEOWNERS` `[edit]` — add the workshop paths (rule 13; there is no workshop entry today)
+
+### Phase 2 — admin CRUD
+- `src/app/actions/admin-workshop-actions.ts` `[new]` — create / update / publish / archive
+- `src/components/admin/workshop-event-form.tsx` `[new]` (client)
+- `src/components/admin/workshop-events-table.tsx` `[new]` (client)
+- `src/app/admin/workshop/page.tsx` `[edit]` — a third **Events** tab
+
+### Phase 3 — coming-soon, calendar toggle, posters
+- `src/lib/platform-config.ts` `[edit]` — register the new keys
+- `src/components/admin/platform-config-panel.tsx` `[edit]` — expose them
+- `src/features/workshop/storage.ts` `[new]` — public Blob put/delete
+- `src/app/actions/admin-workshop-actions.ts` `[edit]` — poster upload
+- `src/components/workshop/WorkshopComingSoon.tsx` `[new]` — the full-page state
+- `src/app/workshop/page.tsx` `[edit]` — branch on mode
+- `src/components/workshop/EventsCalendar.tsx` `[edit]` — respect the toggle
+
+## 7. Server vs Client
+
+| Component | Kind | Note |
+|---|---|---|
+| `/workshop`, `/workshop/events`, `/admin/workshop` pages | Server | Read via `src/repositories/workshop.ts` |
+| `WorkshopComingSoon` | Server | Static content; no interactivity needed |
+| `workshop-event-form`, `workshop-events-table` | Client | Forms and dialogs |
+| `EventsCalendar`, `EventsTimeline` | Client (already) | Receive plain serialisable rows |
+
+**Boundary flag:** the DB carries `iconName: string`. The Server→Client props
+carry that string, never a `LucideIcon`. The name→component map lives in the
+client component. No functions, icons or class instances cross the boundary.
+
+## 8. Steps
+
+### Phase 1
+1. Model + additive migration. Nothing existing is altered or dropped.
+2. Seed script ports all 10 events, **ids verbatim**, and sets `archivedAt` on
+   each. Idempotent (`upsert` by id) so it can be re-run. It prints every id.
+3. **Gate before phase 2:** assert every distinct `WorkshopRegistration.eventId`
+   matches a `WorkshopEvent.id`. If even one does not, stop — a roster is about
+   to detach.
+4. Swap the three read sites to the repository, applying the eligibility rule
+   from §5. With every legacy event archived, the public upcoming surfaces are
+   legitimately empty and must render the TBA / coming-soon state.
+5. Rewrite `getRegistrableEvent` to the §5 rule. Keep its existing
+   "soonest single open event" behaviour — that is what stops two open workshops
+   filing both rosters under the earlier one.
+
+### Phase 2
+6. Actions: `requireAdmin` + Zod + `{ ok, data } | { ok, message }`, each
+   writing an `AdminAction` audit row via `writeAudit`.
+7. The id is **derived from the date and shown read-only**. Never an input.
+8. **Archive, never delete**, for any event with registrations. Deletion only
+   when the roster is empty, and the UI must say which case it is in.
+9. Mirror existing admin form patterns; `AccountOpsDialog`'s reason-plus-confirm
+   is the house style for consequential admin writes.
+
+### Phase 3
+10. Register the config keys; expose them in the admin settings panel.
+11. Poster upload validates **magic bytes server-side**, not just the extension —
+    `src/features/resume/ingest.ts` does exactly this for PDFs and is the pattern
+    to copy. Cap the size. Store the returned URL on the event.
+12. Retire `getWorkshopConfig()` and the Supabase import once the keys move.
+    Leave the cohort-application readers in `workshop-supabase.ts` alone.
+
+## 9. Guardrails (DO NOT)
+
+- **Never let an event id be typed, edited or regenerated after creation.** It is
+  the roster key for 366 rows.
+- **Do not delete an event that has registrations.** Archive it.
+- **Do not surface archived or unpublished events on any public route** — not in
+  the calendar, the timeline, the countdown, or `getRegistrableEvent`.
+- **Do not fall back to a past or archived workshop when nothing is published.**
+  Empty means TBA, never "show the most recent one".
+- **Do not store a `LucideIcon`, or pass one from a Server to a Client
+  Component.** Store the name; map it on the client.
+- **Do not put posters in the résumé Blob store**, and do not make that store
+  public. Résumés carry personal data.
+- Do not add the `WorkshopRegistration.eventId` → `WorkshopEvent.id` FK in phase 1.
+- Do not drop `events-data.ts` wholesale — the type, helpers and icon map stay;
+  only the `EVENTS` array goes.
+- Do not touch the cohort-application functions in `workshop-supabase.ts`.
+- Public surfaces (`/workshop`, `/workshop/events`) stay **public** — no
+  `requireAdmin` / `requireRole` on them.
+- Server Components by default; mutations via Server Actions, not route handlers.
+  Zod at every boundary, `select` on every query, transactions for multi-step
+  writes, `lib/logger.ts` never `console`.
+- `buttonVariants` on `<Link>`, never `<Button asChild>`.
+
+## 10. DB safety
+
+Phase 1 changes data. Before the seed: commit checkpoint, record the hash, take a
+**Neon branch snapshot**. The migration is additive (one new table; nothing on
+`WorkshopRegistration` is altered), so the risk is the seed, not the schema. The
+seed is `upsert`-by-id and idempotent. **Never** `migrate dev` or `migrate reset`
+against a database with real rows — `migrate deploy` only.
+
+## 11. Verification
+
+**Phase 1.** `npx prisma migrate deploy`, `npx prisma generate`, then a script asserting:
+- 10 `WorkshopEvent` rows exist, ids matching the original array exactly;
+- **all 10 have `archivedAt` set**;
+- every distinct `WorkshopRegistration.eventId` matches a `WorkshopEvent.id`;
+- `WorkshopRegistration.count()` is still **366**.
+
+Then, on the public site: **none of the ten legacy events appears** on `/workshop`
+or `/workshop/events`, and with nothing published the page shows the TBA /
+coming-soon state rather than a stale countdown or a past workshop. In
+`/admin/workshop`, all ten are still listed with their registration counts.
+Build gates: `npm run build`, `npx tsc --noEmit`, `npx eslint` on touched files
+— both `tsc` and the build need `NODE_OPTIONS=--max-old-space-size=8192` here.
+
+**Phase 2.** Create a workshop in the console → confirm the derived id and that
+it is **not** public while unpublished → publish it → confirm it becomes the
+first publicly visible workshop and the TBA state is replaced. Confirm an
+`AdminAction` row was written. Attempt to delete one with registrations and
+confirm refusal. Confirm a non-admin gets nothing: `/admin/workshop` redirects
+and the actions refuse.
+
+**Phase 3.** Flip `workshop.mode` to `COMING_SOON` → `/workshop` becomes the
+coming-soon screen with no countdown and no signup; flip back → full
+restoration. Toggle the calendar off and on. Upload a poster and confirm it
+renders **while logged out** (the public-store check), then try a non-image and
+an oversized file and confirm both are refused server-side.
+
+## 12. Ownership
+
+TASK: admin-managed workshops end to end
+MODULE: **Workshop is not assigned to anyone** in CLAUDE.md's ownership table. It
+straddles Platform Admin, System configuration, Database conventions and Audit
+(Sohail) and the public landing's UI/UX (Shallika).
+CROSS-MODULE: `/workshop` and `src/components/workshop/*` are visual surfaces —
+**get Shallika's sign-off before phase 3**, where the coming-soon design lands.
+Phases 1 and 2 are data and admin console. Nothing here touches notifications,
+jobs, hire, resume or recruiter paths.
+
+## 13. Commit messages
+
+- `Move the workshop schedule into the database`
+- `Let an admin create and archive workshops from the console`
+- `Add a coming-soon state, calendar toggle and posters to the workshop page`

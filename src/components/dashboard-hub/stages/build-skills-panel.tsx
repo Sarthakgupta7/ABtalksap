@@ -93,8 +93,20 @@ function cohortItems(p: BuildSkillsPanelProps): LibraryItem[] {
     ...x,
   });
   if (p.showSnowflake) list.push(cohort({ key: "snowflake", title: "Snowflake Data & AI", blurb: "Build a governed Data + AI lakehouse on Snowflake in 15 days.", href: "/program/snowflake", art: "snowflake", days: 15, modules: 6 }));
-  if (p.showDatabricksAi) list.push(cohort({ key: "databricks-ai", title: "Databricks Data & AI", blurb: "Build a governed Data + AI lakehouse on Databricks in 15 days.", href: "/program/databricks-ai", art: "databricks", days: 15, modules: 9 }));
-  if (p.showDatabricks) list.push(cohort({ key: "databricks", title: "Databricks Lakehouse", blurb: "Build a healthcare-claims Lakehouse on Databricks in 31 days.", href: "/program/databricks", art: "databricks", days: 31, modules: 3 }));
+  // One Databricks tile; when the 31-day Lakehouse program is also open it
+  // carries a "2 options available" badge instead of a second tile.
+  if (p.showDatabricksAi) {
+    list.push(cohort({
+      key: "databricks-ai",
+      title: "Databricks Data & AI",
+      blurb: "Build a governed Data + AI lakehouse on Databricks in 15 days.",
+      href: "/program/databricks-ai",
+      art: "databricks",
+      days: 15,
+      modules: 9,
+      badge: p.showDatabricks ? "2 options available" : undefined,
+    }));
+  }
   if (isProgramEnabled()) {
     list.push(cohort({
       key: "ai-cohort",

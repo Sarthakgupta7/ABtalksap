@@ -22,6 +22,8 @@ export type LibraryItem = {
   days: number | null;
   daysLabel: string;
   modules: number | null;
+  /** Small callout pinned to the art, e.g. "2 options available". */
+  badge?: string;
 };
 
 /** Tile artwork: 16:9 covers (1280×720 WebP) that fill the tile. `light`
@@ -153,6 +155,12 @@ function Tile({ item }: { item: LibraryItem }) {
           ) : (
             <GlossyArt Icon={Icon} tint={TINT[item.art]} />
           )}
+          {item.badge ? (
+            <span className="absolute right-2.5 top-2.5 z-10 inline-flex items-center gap-1 rounded-full bg-[#03535F] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white shadow-[0_4px_10px_-4px_rgba(3,83,95,0.7)]">
+              <span className="size-1.5 rounded-full bg-[#2BD4A0]" aria-hidden="true" />
+              {item.badge}
+            </span>
+          ) : null}
           {/* Title on the art, bottom-left, over a soft dark fade. */}
           <div
             className={cn(

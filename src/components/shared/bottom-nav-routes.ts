@@ -58,13 +58,16 @@ const DASHBOARD_SHELL_PREFIXES = [
 /**
  * Surfaces that are not the student app at all, or carry their own chrome.
  *
+ * `claim-profile` and `admin` were added upstream while this was in flight;
+ * both are carried over here so folding the lists together does not undo that.
+ *
  * `admin` is here because `/admin` renders `AdminMobileNav`; without it the
  * student's Home / Jobs / Rewards tabs sit on top of the admin console on
  * every one of its ~46 routes. `hire` and `talent` are the recruiter portal,
  * whose tabs these are not — and the bar was covering the page on mobile.
  */
 const OWN_CHROME =
-  /^\/(login|register|welcome|claude-signup|students|r|program|talent|hire|recruiter-onboarding|verify|admin|workshop|hackathon)(\/|$)/;
+  /^\/(login|register|welcome|claude-signup|students|r|program|talent|hire|recruiter-onboarding|verify|claim-profile|admin|workshop|hackathon)(\/|$)/;
 
 /** The marketing landing has its own header and footer. */
 const LANDING = "/";

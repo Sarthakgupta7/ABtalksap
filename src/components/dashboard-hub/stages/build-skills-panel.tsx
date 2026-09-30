@@ -127,18 +127,6 @@ function challengeItems(p: BuildSkillsPanelProps): LibraryItem[] {
     daysLabel: "Challenge",
     modules: null,
   }));
-  tracks.push({
-    key: "hackathon",
-    kicker: "Hackathon",
-    title: "Vibe Code Hackathon",
-    blurb: "48 hours, solo or in a team, building with AI against a real brief.",
-    href: "/hackathon",
-    cta: "View details",
-    art: "hackathon",
-    days: 2,
-    daysLabel: "Event",
-    modules: null,
-  });
   return tracks;
 }
 

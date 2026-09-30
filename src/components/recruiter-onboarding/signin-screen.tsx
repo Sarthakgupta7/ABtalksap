@@ -40,6 +40,10 @@ import { EMPTY_VISUAL, SupportingVisual } from "./supporting-visual";
  * `recruiter-otp` provider. Plan 154 adds, behind `passwordEnabled`, a
  * password card (the `password` provider, recruiter audience) and a
  * forgot-password card (emailed code + new password).
+ *
+ * Plan 166: password is the default when email login is on; the code flow
+ * is the secondary option. With the flag off, authorizePassword refuses
+ * everyone, so the code flow stays the entry point.
  */
 
 type Screen = "email" | "code" | "password" | "reset";
@@ -52,7 +56,11 @@ export function SigninScreen({
   passwordEnabled?: boolean;
 }) {
   const motionMode = useMotionMode();
-  const [screen, setScreen] = useState<Screen>("email");
+  // Password first (plan 166). Conditional, not absolute: with email login off
+  // `authorizePassword` refuses everyone, so the code flow has to remain the
+  // entry point or nobody can sign in at all.
+  const entryScreen: Screen = passwordEnabled ? "password" : "email";
+  const [screen, setScreen] = useState<Screen>(entryScreen);
   const [dir, setDir] = useState<Direction>(1);
   const [navigated, setNavigated] = useState(false);
   const [email, setEmail] = useState(initialEmail);
@@ -73,6 +81,12 @@ export function SigninScreen({
     setDir(direction);
     setNavigated(true);
     setScreen(next);
+  }
+
+  function goToCodeForm() {
+    setPassword("");
+    setError(null);
+    go("email", 1);
   }
 
   function requestCode() {
@@ -204,6 +218,17 @@ export function SigninScreen({
     );
   }
 
+  const codeInsteadLink = (
+    <button
+      type="button"
+      onClick={goToCodeForm}
+      disabled={pending}
+      className={TEXT_LINK}
+    >
+      Email me a 6-digit code instead
+    </button>
+  );
+
   return (
     <OnboardingShell
       aside={
@@ -234,7 +259,20 @@ export function SigninScreen({
                 </p>
               }
               onSubmit={requestCode}
-              actions={<OnboardingNavigation primaryLabel="Send code" pending={pending} />}
+              actions={
+                <OnboardingNavigation
+                  onBack={
+                    entryScreen === "password"
+                      ? () => {
+                          setError(null);
+                          go("password", -1);
+                        }
+                      : undefined
+                  }
+                  primaryLabel="Send code"
+                  pending={pending}
+                />
+              }
               footer={
                 <div className="space-y-2">
                   {passwordEnabled ? (
@@ -243,7 +281,7 @@ export function SigninScreen({
                         type="button"
                         onClick={() => {
                           setError(null);
-                          go("password", 1);
+                          go("password", -1);
                         }}
                         disabled={pending}
                         className={TEXT_LINK}
@@ -274,7 +312,7 @@ export function SigninScreen({
                     type="email"
                     inputMode="email"
                     autoComplete="email"
-                    autoFocus
+                    autoFocus={entryScreen === "email"}
                     placeholder="you@company.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -296,32 +334,50 @@ export function SigninScreen({
               motion={stepMotion}
               focusHeading={navigated}
               eyebrow="ABTalks Hire"
-              title="Sign in with your password"
-              description={<p>Use the password you set for your work email.</p>}
+              title="Welcome back"
+              description={
+                <p>
+                  Pick up where you left off. Review candidates, track
+                  conversations, and keep your hiring pipeline moving.
+                </p>
+              }
               onSubmit={submitPassword}
               actions={
                 <OnboardingNavigation
-                  onBack={() => {
-                    setPassword("");
-                    setError(null);
-                    go("email", -1);
-                  }}
+                  onBack={
+                    entryScreen === "password"
+                      ? undefined
+                      : () => {
+                          setPassword("");
+                          setError(null);
+                          go("email", -1);
+                        }
+                  }
                   primaryLabel="Sign in"
                   pending={pending}
                 />
               }
               footer={
-                <p>
-                  Forgot it, or never set one?{" "}
-                  <button
-                    type="button"
-                    onClick={requestReset}
-                    disabled={pending}
-                    className={TEXT_LINK}
-                  >
-                    Email me a code to set a password
-                  </button>
-                </p>
+                <div className="space-y-2">
+                  <p>{codeInsteadLink}</p>
+                  <p>
+                    Forgot it, or never set one?{" "}
+                    <button
+                      type="button"
+                      onClick={requestReset}
+                      disabled={pending}
+                      className={TEXT_LINK}
+                    >
+                      Email me a code to set a password
+                    </button>
+                  </p>
+                  <p>
+                    Don’t have an account?{" "}
+                    <Link href="/recruiter-onboarding/signup" className={TEXT_LINK}>
+                      Sign up
+                    </Link>
+                  </p>
+                </div>
               }
             >
               <StaggerItem className="space-y-4">
@@ -336,6 +392,7 @@ export function SigninScreen({
                     type="email"
                     inputMode="email"
                     autoComplete="username"
+                    autoFocus={entryScreen === "password"}
                     placeholder="you@company.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -346,6 +403,10 @@ export function SigninScreen({
                 </Field>
                 {passwordField("si-password", "current-password", "Password")}
                 <FieldError message={error} />
+                {/* Plan 166 §2b: after a failed password attempt, surface the
+                    code route next to the generic error — affordance, not
+                    disclosure of whether a password exists. */}
+                {error ? <p className="text-sm">{codeInsteadLink}</p> : null}
               </StaggerItem>
             </OnboardingStep>
           ) : screen === "reset" ? (
@@ -402,7 +463,7 @@ export function SigninScreen({
                 setCode("");
                 setDevCode(null);
                 setError(null);
-                go("email", -1);
+                go(entryScreen === "password" ? "password" : "email", -1);
               }}
               onSubmit={submitCode}
             />

@@ -163,7 +163,7 @@ function Tile({ item }: { item: LibraryItem }) {
           {/* Title on the art, bottom-left, over a soft dark fade. */}
           <div
             className={cn(
-              "pointer-events-none absolute inset-x-0 bottom-0 px-3 pb-2.5 pt-8",
+              "lib-tile__name pointer-events-none absolute inset-x-0 bottom-0 px-3 pb-2.5 pt-8",
               (art?.light ?? true)
                 ? "bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.95)_75%)]"
                 : "bg-[linear-gradient(180deg,rgba(0,0,0,0)_0%,rgba(0,0,0,0.72)_100%)]",

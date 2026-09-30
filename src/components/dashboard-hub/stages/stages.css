@@ -113,3 +113,9 @@
    the whole row while one of its tiles is open. */
 .lib-row { position: relative; z-index: 1; }
 .lib-row:hover, .lib-row:focus-within { z-index: 20; }
+/* The on-art title hides once the tile opens — the details repeat it. */
+.lib-tile__name { transition: opacity 0.2s ease; }
+@media (hover: hover) and (min-width: 768px) {
+  .lib-tile:hover .lib-tile__name,
+  .lib-tile:focus-within .lib-tile__name { opacity: 0; transition-delay: 0.12s; }
+}

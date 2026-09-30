@@ -156,7 +156,7 @@ function Tile({ item }: { item: LibraryItem }) {
             <GlossyArt Icon={Icon} tint={TINT[item.art]} />
           )}
           {item.badge ? (
-            <span className="absolute right-2.5 top-2.5 z-10 inline-flex items-center rounded-full border border-black/[0.06] bg-white/80 px-2 py-0.5 text-[10px] font-medium text-[#6B7280] backdrop-blur-sm">
+            <span className="absolute right-2.5 top-2.5 z-10 inline-flex items-center rounded-full bg-[#E5E7EB] px-2 py-0.5 text-[10px] font-medium text-black">
               {item.badge}
             </span>
           ) : null}

@@ -191,7 +191,7 @@ export const M8_PREPPILOT_END_TO_END_ARCHITECTURE: ArchitectureVisual = {
     },
     {
       id: "tools",
-      label: "External systems",
+      label: "External",
       x: 680,
       y: 150,
       w: 140,

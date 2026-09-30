@@ -159,7 +159,10 @@
 .crs-kv dd[data-changed="true"] { color: var(--c-pri); font-weight: 700; }
 
 /* SVG diagrams */
-.crs-svg { width: 100%; height: auto; display: block; }
+/* Diagrams scale to fit the visible area: never taller than the viewport
+   minus the app header, sticky heading and the diagram's own controls. */
+.crs-svg { width: 100%; height: auto; display: block; max-height: calc(100vh - var(--crs-top, 55px) - 240px); min-height: 260px; }
+@media (min-width: 900px) { .crs-svg { margin-inline: auto; } }
 .crs-svg text { font-family: inherit; fill: var(--c-fg); }
 .crs-svg .n-box { fill: var(--c-bg); stroke: var(--c-mu); stroke-width: 1.3; transition: fill .25s, stroke .25s; }
 .crs-svg .n-box[data-tone="primary"] { fill: var(--c-tint); stroke: var(--c-pri); stroke-width: 1.6; }

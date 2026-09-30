@@ -67,6 +67,7 @@
     "test:observability:scan": "tsx scripts/scan-log-leaks.ts",
     "sentry:smoke": "tsx scripts/sentry-smoke.ts",
     "test:search-visibility": "cross-env NODE_OPTIONS=--conditions=react-server tsx src/features/hire/search-visibility.test.ts",
+    "test:recruiter-onboarding-persistence": "tsx src/features/hire/recruiter-onboarding-persistence.test.ts",
     "test:recruiter-signin": "tsx src/features/hire/recruiter-signin.test.ts",
     "test:recruiter-delete": "cross-env NODE_OPTIONS=--conditions=react-server tsx src/features/hire/delete-recruiter-account.test.ts",
     "test:admin-create-recruiter": "cross-env NODE_OPTIONS=--conditions=react-server tsx src/features/admin/create-recruiter.test.ts",

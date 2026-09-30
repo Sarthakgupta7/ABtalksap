@@ -31,7 +31,6 @@ auth pages.
 
 ## Other team member surfaced publicly
 
-Sarthak Gupta is publicly listed as a Founding Member of ABTalks.
 
 For questions about ABTalks programs, events, or participation,
 use the official ABTalks contact channel rather than contacting

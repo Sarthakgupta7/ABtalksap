@@ -34,6 +34,7 @@ const DASHBOARD_SHELL_EXACT = new Set([
   "/messages",
   "/mock-interviews",
   "/assessments",
+  "/learn",
   // Challenge tracks render inside DashboardShell too.
   "/claude",
   "/ai",
@@ -51,6 +52,7 @@ const DASHBOARD_SHELL_PREFIXES = [
   "/profile/",
   // Assessment detail, same shell as the list.
   "/assessments/",
+  "/learn/",
   "/claude/day",
   "/challenge/",
 ];

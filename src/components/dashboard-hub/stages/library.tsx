@@ -24,15 +24,16 @@ export type LibraryItem = {
   modules: number | null;
 };
 
-/** Tile artwork. `logo` art sits on white and is shown whole; covers fill. */
-const ART: Partial<Record<LibraryArt, { src: string; logo: boolean }>> = {
-  snowflake: { src: "/dashboard/snowflake.png", logo: true },
-  databricks: { src: "/dashboard/databricks.png", logo: true },
-  cohort: { src: "/dashboard/ai-cohort.svg", logo: true },
-  ai: { src: "/dashboard/ai-track.jpg", logo: false },
-  se: { src: "/dashboard/track-thumb.png", logo: false },
-  ds: { src: "/dashboard/track-ds.svg", logo: false },
-  claude: { src: "/dashboard/track-claude.svg", logo: false },
+/** Tile artwork: 16:9 covers (1280×720 WebP) that fill the tile. `light`
+ *  covers get a white fade + dark title; dark ones a dark fade + white title. */
+const ART: Partial<Record<LibraryArt, { src: string; light: boolean }>> = {
+  snowflake: { src: "/dashboard/cover-snowflake.webp", light: true },
+  databricks: { src: "/dashboard/cover-databricks.webp", light: true },
+  cohort: { src: "/dashboard/cover-ai.webp", light: true },
+  ai: { src: "/dashboard/cover-ai.webp", light: true },
+  se: { src: "/dashboard/cover-se.webp", light: true },
+  ds: { src: "/dashboard/cover-ds.webp", light: true },
+  claude: { src: "/dashboard/cover-claude.webp", light: true },
 };
 
 const ICON: Record<LibraryArt, typeof Code2> = {
@@ -141,13 +142,13 @@ function Tile({ item }: { item: LibraryItem }) {
         aria-label={item.title}
         className="lib-tile__card block rounded-xl bg-white shadow-[0_10px_24px_-16px_rgba(0,0,0,0.35)] ring-1 ring-black/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#03535F]"
       >
-        <div className={cn("lib-tile__img relative aspect-[16/9] overflow-hidden rounded-xl", art?.logo ? "bg-white" : "bg-[#0A0F12]")}>
+        <div className={cn("lib-tile__img relative aspect-[16/9] overflow-hidden rounded-xl", (art?.light ?? true) ? "bg-white" : "bg-[#0A0F12]")}>
           {art ? (
             // eslint-disable-next-line @next/next/no-img-element -- static tile art
             <img
               src={art.src}
               alt=""
-              className={cn("absolute inset-0 size-full", art.logo ? "object-contain p-2" : "object-cover object-right")}
+              className="absolute inset-0 size-full object-cover"
             />
           ) : (
             <GlossyArt Icon={Icon} tint={TINT[item.art]} />
@@ -156,7 +157,7 @@ function Tile({ item }: { item: LibraryItem }) {
           <div
             className={cn(
               "pointer-events-none absolute inset-x-0 bottom-0 px-3 pb-2.5 pt-8",
-              art?.logo
+              (art?.light ?? true)
                 ? "bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.95)_75%)]"
                 : "bg-[linear-gradient(180deg,rgba(0,0,0,0)_0%,rgba(0,0,0,0.72)_100%)]",
             )}
@@ -164,7 +165,7 @@ function Tile({ item }: { item: LibraryItem }) {
             <p
               className={cn(
                 "truncate font-heading text-[15px] font-bold leading-tight",
-                art?.logo ? "text-[#1F1F1F]" : "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]",
+                (art?.light ?? true) ? "text-[#1F1F1F]" : "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]",
               )}
             >
               {item.title}

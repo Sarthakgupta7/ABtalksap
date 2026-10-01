@@ -148,8 +148,8 @@ export function PlatformAudiencePicker({
       </div>
       <p className="hire-assess-hint">
         {locked
-          ? "Ticked groups already have it and can't be removed. Tick more to send it to them too — nobody gets a second copy."
-          : "Sent to everyone in these groups right now; people who join later won't get it. It appears in the Platform tab of their Assessments page."}
+          ? "Ticked groups already have it and can't be removed."
+          : "Sent to everyone in these groups right now; people who join later won't get it."}
       </p>
 
       <fieldset disabled={disabled} className="mt-5 space-y-5 border-0 p-0">
@@ -313,7 +313,7 @@ export function PlatformDeadlineField({
         <span className="hire-assess-hint">
           {noDeadline
             ? "Stays open with no closing date. Candidates can take it any time."
-            : "After this, submissions close. Anyone mid-attempt is submitted automatically with their saved answers; anyone who never started is marked missed."}
+            : "After this, submissions close."}
           {sent && !noDeadline
             ? " Moving it later reopens it for anyone who hasn't submitted."
             : null}

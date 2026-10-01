@@ -27,9 +27,6 @@ type Props = {
   options: PlatformAudienceOptions;
   audience: PlatformAudienceValue;
   onAudienceChange: (next: PlatformAudienceValue) => void;
-  /** `YYYY-MM-DDTHH:mm`, read as IST. */
-  deadlineLocal: string;
-  onDeadlineChange: (next: string) => void;
   disabled: boolean;
   /**
    * Editing a sent assessment: the groups that already received it. They show
@@ -85,12 +82,9 @@ export function PlatformAudiencePicker({
   options,
   audience,
   onAudienceChange,
-  deadlineLocal,
-  onDeadlineChange,
   disabled,
   lockedAudience,
 }: Props) {
-  const minLocal = formatInTimeZone(new Date(), IST, "yyyy-MM-dd'T'HH:mm");
   const locked = lockedAudience ?? null;
 
   return (
@@ -219,25 +213,46 @@ export function PlatformAudiencePicker({
         )}
       </fieldset>
 
-      <label className="hire-assess-field">
-        <span>Deadline (IST)</span>
-        <input
-          type="datetime-local"
-          value={deadlineLocal}
-          min={minLocal}
-          disabled={disabled}
-          onChange={(e) => onDeadlineChange(e.target.value)}
-          required
-        />
-        <span className="hire-assess-hint">
-          After this, the assessment closes. Anyone mid-attempt is submitted
-          automatically with the answers they saved. Anyone who never started is
-          marked as missed.
-          {locked
-            ? " Moving it later reopens the assessment for anyone who hasn't submitted yet."
-            : null}
-        </span>
-      </label>
     </section>
+  );
+}
+
+/**
+ * The deadline input, rendered in the builder's Settings card. `sent` adds the
+ * note that moving it later reopens the assessment.
+ */
+export function PlatformDeadlineField({
+  value,
+  onChange,
+  disabled,
+  sent,
+}: {
+  /** `YYYY-MM-DDTHH:mm`, read as IST. */
+  value: string;
+  onChange: (next: string) => void;
+  disabled: boolean;
+  sent: boolean;
+}) {
+  const minLocal = formatInTimeZone(new Date(), IST, "yyyy-MM-dd'T'HH:mm");
+  return (
+    <label className="hire-assess-field">
+      <span>Deadline (IST)</span>
+      <input
+        type="datetime-local"
+        value={value}
+        min={minLocal}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        required
+      />
+      <span className="hire-assess-hint">
+        After this, the assessment closes. Anyone mid-attempt is submitted
+        automatically with the answers they saved. Anyone who never started is
+        marked as missed.
+        {sent
+          ? " Moving it later reopens the assessment for anyone who hasn't submitted yet."
+          : null}
+      </span>
+    </label>
   );
 }

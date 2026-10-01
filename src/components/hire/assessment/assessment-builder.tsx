@@ -15,6 +15,7 @@ import {
 } from "@/app/actions/admin-assessment-actions";
 import {
   PlatformAudiencePicker,
+  PlatformDeadlineField,
   audienceEstimate,
   defaultDeadlineLocal,
   isoToIstLocal,
@@ -682,6 +683,16 @@ export function AssessmentBuilder({
                   <span>Require camera</span>
                 </label>
               </div>
+              {platform ? (
+                <div className="hire-assess-setting" style={{ gridColumn: "span 2" }}>
+                  <PlatformDeadlineField
+                    value={deadlineLocal}
+                    onChange={setDeadlineLocal}
+                    disabled={pending}
+                    sent={sent !== null}
+                  />
+                </div>
+              ) : null}
             </div>
           </section>
 
@@ -756,8 +767,6 @@ export function AssessmentBuilder({
               options={platform.audienceOptions}
               audience={audience}
               onAudienceChange={setAudience}
-              deadlineLocal={deadlineLocal}
-              onDeadlineChange={setDeadlineLocal}
               disabled={pending}
               lockedAudience={sent?.audience}
             />

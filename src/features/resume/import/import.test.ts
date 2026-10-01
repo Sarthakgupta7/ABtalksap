@@ -1041,6 +1041,29 @@ async function main() {
     assert(!table.includes("blobPathname"), "table leaks blobPathname");
   });
 
+  /* ─── Plan 172 — date matched count ───────────────────────────────────── */
+  console.log("\nPlan 172 — resume-import date count");
+
+  await suite("matchedTotal uses countImportsMatched; status cards stay unscoped", () => {
+    const status = src("src/features/resume/import/status.ts");
+    assert(status.includes("matchedTotal"), "no matchedTotal on ImportStatusView");
+    assert(status.includes("countImportsMatched("), "loadImportStatus does not call countImportsMatched");
+    assert(status.includes("countImportsByStatus()"), "global counts must stay unscoped");
+    const repo = src("src/repositories/resume-import.ts");
+    assert(repo.includes("function importListWhere"), "shared where helper missing");
+    assert(repo.includes("export async function countImportsMatched"), "countImportsMatched missing");
+  });
+
+  await suite("Today button uses Asia/Kolkata and shows matched count for a date", () => {
+    const table = src("src/app/admin/resume-imports/import-table.tsx");
+    assert(table.includes("function todayIstYmd"), "Today helper missing");
+    assert(table.includes('timeZone: "Asia/Kolkata"'), "Today is not IST");
+    assert(table.includes("setDate(todayIstYmd())"), "Today button does not set IST date");
+    assert(table.includes("view.matchedTotal"), "matchedTotal not shown in UI");
+    assert(table.includes("imported on"), "date count label missing");
+    assert(!table.includes("countImportsByStatus"), "table must not re-scope global counts");
+  });
+
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed > 0) process.exit(1);
   process.exit(0);

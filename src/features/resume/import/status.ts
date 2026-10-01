@@ -2,6 +2,7 @@ import "server-only";
 import type { ResumeImportStatus } from "@prisma/client";
 import {
   countImportsByStatus,
+  countImportsMatched,
   importUsageTotals,
   isWorkerLeaseLive,
   listImports,
@@ -41,7 +42,10 @@ export type ImportRowView = {
 export type ImportStatusView = {
   rows: ImportRowView[];
   nextCursor: string | null;
+  /** All-time status totals — drives summary cards and Parse/Register-all labels. */
   counts: Record<ResumeImportStatus, number>;
+  /** Rows matching the active status / search / date filters (all pages). */
+  matchedTotal: number;
   usage: ImportUsageTotals;
   workerRunning: boolean;
 };
@@ -52,15 +56,19 @@ export async function loadImportStatus(input: {
   search?: string;
   date?: string;
 }): Promise<ImportStatusView> {
-  const [list, counts, usage, workerRunning] = await Promise.all([
+  const filters = {
+    status: input.status,
+    search: input.search,
+    date: input.date,
+  };
+  const [list, counts, matchedTotal, usage, workerRunning] = await Promise.all([
     listImports({
-      status: input.status,
+      ...filters,
       cursor: input.cursor,
-      search: input.search,
-      date: input.date,
       take: 100,
     }),
     countImportsByStatus(),
+    countImportsMatched(filters),
     importUsageTotals(),
     isWorkerLeaseLive(),
   ]);
@@ -84,6 +92,7 @@ export async function loadImportStatus(input: {
     })),
     nextCursor: list.nextCursor,
     counts,
+    matchedTotal,
     usage,
     workerRunning,
   };

@@ -37,7 +37,7 @@ export async function sendVideoWelcomeEmail(
     <p style="margin:0 0 16px;">
       Kickoff: ${VIDEOTHON.kickoffLabel}<br>
       Deadline: ${VIDEOTHON.deadlineLabel}<br>
-      Results: ${VIDEOTHON.resultsLabel}
+      ${VIDEOTHON.resultsLabel}
     </p>
     ${whatsappHtml}
     <p style="margin:0 0 24px;">Thanks,<br>The ABTalks team</p>
@@ -58,7 +58,7 @@ export async function sendVideoWelcomeEmail(
     "Dates",
     `Kickoff: ${VIDEOTHON.kickoffLabel}`,
     `Deadline: ${VIDEOTHON.deadlineLabel}`,
-    `Results: ${VIDEOTHON.resultsLabel}`,
+    VIDEOTHON.resultsLabel,
     "",
     VIDEOTHON.whatsappLink
       ? `Kickoff updates and the brief are shared in the WhatsApp group: ${VIDEOTHON.whatsappLink}\n`

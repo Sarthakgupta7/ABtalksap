@@ -10,12 +10,17 @@ import {
 } from "@/app/actions/recruiter-assessment-actions";
 import {
   createAndSendPlatformAssessmentAction,
+  editSentPlatformAssessmentAction,
   savePlatformAssessmentAction,
 } from "@/app/actions/admin-assessment-actions";
 import {
   PlatformAudiencePicker,
+  PlatformDeadlineField,
+  SETTING_HEAD_CLASS,
+  SETTING_LABEL_CLASS,
   audienceEstimate,
   defaultDeadlineLocal,
+  isoToIstLocal,
   istLocalToIso,
   type PlatformAudienceOptions,
   type PlatformAudienceValue,
@@ -33,6 +38,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CandidateAssessmentScreen } from "./candidate-assessment-screen";
+import { FormattedText } from "@/components/assessments/formatted-text";
 import { QuestionEditor } from "./question-editor";
 import type { AssessmentDraft, DraftQuestion } from "./assessment-types";
 import { cn } from "@/lib/utils";
@@ -93,8 +99,50 @@ type Props = {
    * actions and the send step picks an audience + deadline instead of a
    * Shortlist (`candidates` is then empty and unused).
    */
-  platform?: { audienceOptions: PlatformAudienceOptions };
+  platform?: {
+    audienceOptions: PlatformAudienceOptions;
+    /**
+     * Plan 166: editing an assessment that was already sent. Anything can
+     * change until someone starts; after that only wording (`startedCount`
+     * > 0). The deadline can move and groups can be added, never removed.
+     */
+    sent?: {
+      /** Null = the assessment has no deadline. */
+      deadlineAt: string | null;
+      audience: PlatformAudienceValue;
+      startedCount: number;
+    };
+  };
 };
+
+/** Plan 166 — the formatting authors can use, shown in the callout. */
+function FormattingHelp() {
+  const chip =
+    "rounded bg-white px-1.5 py-0.5 font-mono text-[12px] text-[#03535F] ring-1 ring-[#D4EBEC]";
+  return (
+    <div>
+      <p>
+        <strong>Formatting</strong> works in questions, help text, options and
+        instructions:
+      </p>
+      <ul className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1.5">
+        <li>
+          <code className={chip}>*bold*</code> → <strong>bold</strong>
+        </li>
+        <li>
+          <code className={chip}>_italic_</code> → <em>italic</em>
+        </li>
+        <li>
+          <code className={chip}>`code`</code> → <FormattedText text="`code`" />
+        </li>
+        <li>
+          <kbd className={chip}>Enter</kbd> → new line (questions and
+          instructions)
+        </li>
+      </ul>
+    </div>
+  );
+}
 
 const EMPTY_AUDIENCE: PlatformAudienceValue = { all: false, domains: [], workshopEventIds: [] };
 
@@ -140,13 +188,37 @@ export function AssessmentBuilder({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [confirming, setConfirming] = useState(false);
-  const [audience, setAudience] = useState<PlatformAudienceValue>(EMPTY_AUDIENCE);
-  const [deadlineLocal, setDeadlineLocal] = useState(() =>
-    platform ? defaultDeadlineLocal() : "",
+  const sent = platform?.sent ?? null;
+  // Someone has started a sent assessment: only wording may change.
+  const wordingOnly = (sent?.startedCount ?? 0) > 0;
+  const [audience, setAudience] = useState<PlatformAudienceValue>(
+    sent?.audience ?? EMPTY_AUDIENCE,
   );
+  const [deadlineLocal, setDeadlineLocal] = useState(() =>
+    sent?.deadlineAt
+      ? isoToIstLocal(sent.deadlineAt)
+      : platform
+        ? defaultDeadlineLocal()
+        : "",
+  );
+  // Plan 166: a platform assessment may stay open with no closing date.
+  const [noDeadline, setNoDeadline] = useState(
+    sent !== null && sent.deadlineAt === null,
+  );
+  const deadlineMissing = !noDeadline && !istLocalToIso(deadlineLocal);
   const audienceCount = platform ? audienceEstimate(platform.audienceOptions, audience) : 0;
   const hasAudience =
     audience.all || audience.domains.length > 0 || audience.workshopEventIds.length > 0;
+  const addsGroups =
+    sent !== null &&
+    ((audience.all && !sent.audience.all) ||
+      audience.domains.some((d) => !sent.audience.domains.includes(d)) ||
+      audience.workshopEventIds.some((w) => !sent.audience.workshopEventIds.includes(w)));
+  // Upper bound; anyone who already has it is skipped on save.
+  const addedCount =
+    sent && platform
+      ? Math.max(0, audienceCount - audienceEstimate(platform.audienceOptions, sent.audience))
+      : 0;
 
   // Provenance only (nothing reads it — plan 128 §2): the Shortlist this was
   // built against.
@@ -185,13 +257,17 @@ export function AssessmentBuilder({
   const picked = candidates.filter((c) => selected.has(c.candidateRef));
   const pickedCount = picked.length;
   const allPicked = candidates.length > 0 && pickedCount === candidates.length;
-  const createBlockedReason = platform
+  const createBlockedReason = sent
+    ? deadlineMissing
+      ? "Set a deadline, or tick No deadline."
+      : null
+    : platform
     ? !hasAudience
       ? "Pick who this assessment goes to."
       : audienceCount === 0
         ? "Nobody is in the groups you picked yet."
-        : !istLocalToIso(deadlineLocal)
-          ? "Set a deadline."
+        : deadlineMissing
+          ? "Set a deadline, or tick No deadline."
           : null
     : candidates.length === 0
       ? "Your Shortlist is empty — shortlist candidates on Hire to send this. You can still save a draft."
@@ -339,10 +415,10 @@ export function AssessmentBuilder({
   }
 
   function createPlatform(draft: AssessmentDraftInput) {
-    const deadlineAt = istLocalToIso(deadlineLocal);
-    if (!deadlineAt) {
+    const deadlineAt = noDeadline ? null : istLocalToIso(deadlineLocal);
+    if (deadlineMissing) {
       setConfirming(false);
-      toast.error("Set a deadline.");
+      toast.error("Set a deadline, or tick No deadline.");
       return;
     }
     setPendingAction("create");
@@ -363,7 +439,55 @@ export function AssessmentBuilder({
     });
   }
 
-  const heading = presetLocked
+  /** Editing a sent assessment: confirm first only when it reaches new people. */
+  function askSaveSent() {
+    if (createBlockedReason) {
+      toast.error(createBlockedReason);
+      return;
+    }
+    const draft = validDraft();
+    if (!draft) return;
+    if (addsGroups) {
+      setConfirming(true);
+      return;
+    }
+    saveSent(draft);
+  }
+
+  function saveSent(draft: AssessmentDraftInput | null = validDraft()) {
+    const deadlineAt = noDeadline ? null : istLocalToIso(deadlineLocal);
+    if (!draft || deadlineMissing || !assessmentId) {
+      setConfirming(false);
+      if (deadlineMissing) toast.error("Set a deadline, or tick No deadline.");
+      return;
+    }
+    setPendingAction("create");
+    startTransition(async () => {
+      const res = await editSentPlatformAssessmentAction({
+        assessmentId,
+        draft,
+        audience,
+        deadlineAt,
+      });
+      setPendingAction(null);
+      setConfirming(false);
+      if (!res.ok) {
+        toast.error(res.message);
+        return;
+      }
+      const n = res.data.added;
+      toast.success(
+        n > 0
+          ? `Changes saved and sent to ${n.toLocaleString("en-IN")} more candidate${n === 1 ? "" : "s"}.`
+          : "Changes saved.",
+      );
+      router.push(`/admin/assessments/${assessmentId}`);
+    });
+  }
+
+  const heading = sent
+    ? "Edit sent assessment"
+    : presetLocked
     ? "Customize a template"
     : assessmentId
       ? "Edit assessment"
@@ -388,13 +512,13 @@ export function AssessmentBuilder({
             </>
           ) : (
             <>
-              <p className="hire-assess__kicker">
-                {platform ? "Platform assessment" : "Assessment builder"}
-              </p>
+              {platform ? null : (
+                <p className="hire-assess__kicker">Assessment builder</p>
+              )}
               <h1>{heading}</h1>
               <p className="hire-assess__sub">
                 {platform
-                  ? "Sent by ABTalks to the candidates you choose below"
+                  ? ""
                   : `For ${candidates.length} shortlisted candidate${candidates.length === 1 ? "" : "s"}`}
               </p>
             </>
@@ -441,12 +565,21 @@ export function AssessmentBuilder({
             your own.
           </p>
         ) : null}
-        <p>
-          Published assessments run in strict mode: laptop or desktop only,
-          fullscreen required, copy and paste blocked, and page activity
-          recorded for you to review.
-          {platform ? " Candidates never see their score." : null}
-        </p>
+        {sent ? (
+          <p>
+            {wordingOnly
+              ? `${sent.startedCount} candidate${sent.startedCount === 1 ? " has" : "s have"} started, so questions, answers, points and settings are locked. You can still fix wording, move the deadline and add groups.`
+              : "Nobody has started yet, so you can change anything. Once someone starts, only wording and the deadline can change."}
+          </p>
+        ) : null}
+        {platform ? null : (
+          <p>
+            Published assessments run in strict mode: laptop or desktop only,
+            fullscreen required, copy and paste blocked, and page activity
+            recorded for you to review.
+          </p>
+        )}
+        <FormattingHelp />
       </div>
 
       <div className="hire-assess__panes" data-mode={mode}>
@@ -500,14 +633,35 @@ export function AssessmentBuilder({
               Settings
             </h2>
             <div className="hire-assess__settings">
+              {/* Every setting is a heading row (with its checkbox, if any)
+                  above one control, so the columns line up. Checkboxes stay
+                  out of .hire-assess-field, which styles inputs as text boxes. */}
               <div className="hire-assess-setting">
-                <label className="hire-assess-field">
-                  <span>Duration (minutes)</span>
+                <div className={SETTING_HEAD_CLASS}>
+                  <label htmlFor="assess-duration" className={SETTING_LABEL_CLASS}>
+                    Duration (minutes)
+                  </label>
+                  <label className="hire-assess-check">
+                    <input
+                      type="checkbox"
+                      checked={untimed}
+                      disabled={wordingOnly}
+                      onChange={(e) => {
+                        setUntimed(e.target.checked);
+                        if (e.target.checked) setDurationMinutes(null);
+                        else if (durationMinutes == null) setDurationMinutes(30);
+                      }}
+                    />
+                    <span>Untimed</span>
+                  </label>
+                </div>
+                <div className="hire-assess-field">
                   <input
+                    id="assess-duration"
                     type="number"
                     min={1}
                     max={480}
-                    disabled={untimed}
+                    disabled={untimed || wordingOnly}
                     value={durationMinutes ?? ""}
                     placeholder={untimed ? "Untimed" : undefined}
                     onChange={(e) =>
@@ -516,49 +670,54 @@ export function AssessmentBuilder({
                       )
                     }
                   />
-                </label>
-                <label className="hire-assess-check">
-                  <input
-                    type="checkbox"
-                    checked={untimed}
-                    onChange={(e) => {
-                      setUntimed(e.target.checked);
-                      if (e.target.checked) setDurationMinutes(null);
-                      else if (durationMinutes == null) setDurationMinutes(30);
-                    }}
-                  />
-                  <span>Untimed</span>
-                </label>
+                </div>
               </div>
               <div className="hire-assess-setting">
-                <label className="hire-assess-field">
-                  <span>Pass mark (%)</span>
+                <div className={SETTING_HEAD_CLASS}>
+                  <label htmlFor="assess-pass" className={SETTING_LABEL_CLASS}>
+                    Pass percentage
+                  </label>
+                </div>
+                <div className="hire-assess-field">
                   <input
+                    id="assess-pass"
                     type="number"
                     min={0}
                     max={100}
                     value={passMarkPercent}
+                    disabled={wordingOnly}
                     onChange={(e) =>
                       setPassMarkPercent(Number(e.target.value) || 0)
                     }
                   />
+                </div>
+              </div>
+              <div className="hire-assess-setting">
+                <div className={SETTING_HEAD_CLASS}>
+                  <span className={SETTING_LABEL_CLASS}>Camera</span>
+                </div>
+                <label className="hire-assess-check" style={{ minHeight: 42 }}>
+                  <input
+                    type="checkbox"
+                    checked={cameraRequired}
+                    disabled={wordingOnly}
+                    onChange={(e) => setCameraRequired(e.target.checked)}
+                  />
+                  <span>Require camera</span>
                 </label>
               </div>
-              <label className="hire-assess-setting hire-assess-setting--toggle">
-                <input
-                  type="checkbox"
-                  checked={cameraRequired}
-                  onChange={(e) => setCameraRequired(e.target.checked)}
-                />
-                <span className="hire-assess-setting__text">
-                  <span className="hire-assess-setting__label">Require camera</span>
-                  <span className="hire-assess-hint">
-                    Candidates keep their camera on to see the questions.
-                    ABTalks never records or sees the video — only when the
-                    camera is on or off.
-                  </span>
-                </span>
-              </label>
+              {platform ? (
+                <div className="hire-assess-setting" style={{ gridColumn: "span 2" }}>
+                  <PlatformDeadlineField
+                    value={deadlineLocal}
+                    onChange={setDeadlineLocal}
+                    noDeadline={noDeadline}
+                    onNoDeadlineChange={setNoDeadline}
+                    disabled={pending}
+                    sent={sent !== null}
+                  />
+                </div>
+              ) : null}
             </div>
           </section>
 
@@ -567,20 +726,23 @@ export function AssessmentBuilder({
               <h2 id="assess-questions-heading">
                 Questions <span className="hire-assess__count">{questions.length}</span>
               </h2>
-              <button
-                type="button"
-                className="hire-assess__addbtn"
-                onClick={() => setQuestions((q) => [...q, NEW_MCQ()])}
-              >
-                <Plus aria-hidden="true" />
-                Add question
-              </button>
+              {wordingOnly ? null : (
+                <button
+                  type="button"
+                  className="hire-assess__addbtn"
+                  onClick={() => setQuestions((q) => [...q, NEW_MCQ()])}
+                >
+                  <Plus aria-hidden="true" />
+                  Add question
+                </button>
+              )}
             </div>
             {questions.map((q, i) => (
               <QuestionEditor
                 key={q.key}
                 question={q}
                 locked={q.locked ?? false}
+                wordingOnly={wordingOnly}
                 index={i}
                 total={questions.length}
                 onChange={(next) =>
@@ -610,14 +772,16 @@ export function AssessmentBuilder({
                 }}
               />
             ))}
-            <button
-              type="button"
-              className="hire-assess__addrow"
-              onClick={() => setQuestions((q) => [...q, NEW_MCQ()])}
-            >
-              <Plus aria-hidden="true" />
-              Add another question
-            </button>
+            {wordingOnly ? null : (
+              <button
+                type="button"
+                className="hire-assess__addrow"
+                onClick={() => setQuestions((q) => [...q, NEW_MCQ()])}
+              >
+                <Plus aria-hidden="true" />
+                Add another question
+              </button>
+            )}
             {fieldErrors.questions ? (
               <span className="hire-assess-error">{fieldErrors.questions}</span>
             ) : null}
@@ -628,9 +792,8 @@ export function AssessmentBuilder({
               options={platform.audienceOptions}
               audience={audience}
               onAudienceChange={setAudience}
-              deadlineLocal={deadlineLocal}
-              onDeadlineChange={setDeadlineLocal}
               disabled={pending}
+              lockedAudience={sent?.audience}
             />
           ) : (
             <section className="hire-assess__send" aria-labelledby="assess-send-heading">
@@ -649,11 +812,7 @@ export function AssessmentBuilder({
                   </button>
                 )}
               </div>
-              <p className="hire-assess-hint">
-                Create publishes this assessment and sends it to the candidates
-                you tick. Each one is notified and finds it on their Assessments
-                page.
-              </p>
+              
               {candidates.length === 0 ? (
                 <p className="hire-assess__send-empty">
                   Your Shortlist is empty. Shortlist candidates on Hire first — you
@@ -692,11 +851,18 @@ export function AssessmentBuilder({
                 role="group"
                 aria-label="Confirm create"
               >
-                {platform ? (
+                {sent ? (
+                  <p>
+                    Save changes and send to up to {addedCount.toLocaleString("en-IN")}{" "}
+                    more candidate{addedCount === 1 ? "" : "s"}? Anyone who already
+                    has it isn&apos;t sent a second copy.
+                  </p>
+                ) : platform ? (
                   <p>
                     Publish and send to up to {audienceCount.toLocaleString("en-IN")}{" "}
-                    candidate{audienceCount === 1 ? "" : "s"}? Publishing locks the
-                    questions, the pass mark and the deadline.
+                    candidate{audienceCount === 1 ? "" : "s"}? It goes out now. You
+                    can edit anything until someone starts, then only wording, the
+                    deadline and groups.
                   </p>
                 ) : (
                   <p>
@@ -718,9 +884,15 @@ export function AssessmentBuilder({
                     type="button"
                     className="hire-assess__savebtn"
                     disabled={pending}
-                    onClick={create}
+                    onClick={sent ? () => saveSent() : create}
                   >
-                    {pendingAction === "create" ? "Creating…" : "Create"}
+                    {sent
+                      ? pendingAction === "create"
+                        ? "Saving…"
+                        : "Save and send"
+                      : pendingAction === "create"
+                        ? "Creating…"
+                        : "Create"}
                   </button>
                 </div>
               </div>
@@ -728,29 +900,47 @@ export function AssessmentBuilder({
               <>
                 <p id="assess-create-hint" className="hire-assess-hint hire-assess__save-hint">
                   {createBlockedReason ??
-                    (platform
+                    (sent
+                      ? addsGroups
+                        ? `Also sends it to up to ${addedCount.toLocaleString("en-IN")} more candidate${addedCount === 1 ? "" : "s"}.`
+                        : "Candidates see your changes the next time they open it."
+                      : platform
                       ? `Sends to up to ${audienceCount.toLocaleString("en-IN")} candidate${audienceCount === 1 ? "" : "s"}.`
                       : `Sends to ${pickedCount} selected candidate${pickedCount === 1 ? "" : "s"}.`)}
                 </p>
-                <div className="hire-assess__save-actions">
-                  <button
-                    type="button"
-                    className="hire-assess__savebtn hire-assess__savebtn--ghost"
-                    disabled={pending}
-                    onClick={save}
-                  >
-                    {pendingAction === "save" ? "Saving…" : "Save draft"}
-                  </button>
-                  <button
-                    type="button"
-                    className="hire-assess__savebtn"
-                    disabled={pending || Boolean(createBlockedReason)}
-                    aria-describedby="assess-create-hint"
-                    onClick={askCreate}
-                  >
-                    Create
-                  </button>
-                </div>
+                {sent ? (
+                  <div className="hire-assess__save-actions">
+                    <button
+                      type="button"
+                      className="hire-assess__savebtn"
+                      disabled={pending || Boolean(createBlockedReason)}
+                      aria-describedby="assess-create-hint"
+                      onClick={askSaveSent}
+                    >
+                      {pendingAction === "create" ? "Saving…" : "Save changes"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="hire-assess__save-actions">
+                    <button
+                      type="button"
+                      className="hire-assess__savebtn hire-assess__savebtn--ghost"
+                      disabled={pending}
+                      onClick={save}
+                    >
+                      {pendingAction === "save" ? "Saving…" : "Save draft"}
+                    </button>
+                    <button
+                      type="button"
+                      className="hire-assess__savebtn"
+                      disabled={pending || Boolean(createBlockedReason)}
+                      aria-describedby="assess-create-hint"
+                      onClick={askCreate}
+                    >
+                      Create
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>

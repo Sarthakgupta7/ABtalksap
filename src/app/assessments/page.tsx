@@ -26,7 +26,7 @@ const TABS: { value: Tab; label: string; blurb: string }[] = [
     value: "platform",
     label: "Platform",
     blurb:
-      "Sent by the ABTalks team. Finish before the deadline — an attempt still open when it passes is submitted automatically with the answers you saved.",
+      "Sent by the ABTalks team. Finish before submissions close — an attempt still open then is submitted automatically with the answers you saved.",
   },
   {
     value: "recruiter",
@@ -70,7 +70,7 @@ function stateOf(row: AttemptListRow, now: Date): RowState {
 
 const isOpen = (s: RowState) => s === "NOT_STARTED" || s === "IN_PROGRESS";
 
-/** "Due in 3 days", "Due in 5 hours", "Due in 20 min" — with urgency tone. */
+/** "Closes in 3 days", "Closes in 5 hours", "Closes in 20 min" — with urgency tone. */
 function dueLabel(
   closesAt: Date,
   now: Date,
@@ -79,12 +79,15 @@ function dueLabel(
   const hours = ms / 3_600_000;
   const tone = hours <= 24 ? "urgent" : hours <= 72 ? "soon" : "normal";
   if (hours >= 48)
-    return { text: `Due in ${Math.floor(hours / 24)} days`, tone };
+    return { text: `Closes in ${Math.floor(hours / 24)} days`, tone };
   if (hours >= 1) {
     const h = Math.floor(hours);
-    return { text: `Due in ${h} hour${h === 1 ? "" : "s"}`, tone };
+    return { text: `Closes in ${h} hour${h === 1 ? "" : "s"}`, tone };
   }
-  return { text: `Due in ${Math.max(1, Math.floor(ms / 60_000))} min`, tone };
+  return {
+    text: `Closes in ${Math.max(1, Math.floor(ms / 60_000))} min`,
+    tone,
+  };
 }
 
 export default async function AssessmentsPage({
@@ -237,7 +240,7 @@ function EmptyState({ tab }: { tab: Tab }) {
       </p>
       <p className="max-w-sm text-sm text-[#787878]">
         {tab === "platform"
-          ? "When the ABTalks team sends you an assessment, it appears here with its deadline."
+          ? "When the ABTalks team sends you an assessment, it appears here with when submissions close."
           : "When a recruiter invites you to one, it appears here and in your notifications."}
       </p>
     </div>
@@ -281,7 +284,7 @@ function Section({
           >
             <span>Assessment</span>
             <span>Details</span>
-            <span>{tab === "platform" ? "Deadline" : "Received"}</span>
+            <span>{tab === "platform" ? "Submissions close" : "Received"}</span>
             <span />
           </div>
           <ul className="mt-3 divide-y divide-[#E9E9E9] border-y border-[#E9E9E9] md:mt-0 md:border-t-0">
@@ -309,10 +312,12 @@ function Row({ row, tab, now }: { row: AttemptListRow; tab: Tab; now: Date }) {
   const when =
     state === "SUBMITTED" && row.submittedAt
       ? `Submitted ${formatDateIST(row.submittedAt)}`
-      : tab === "platform" && row.closesAt
-        ? state === "MISSED"
-          ? `Closed ${formatDateIST(row.closesAt)}`
-          : formatDateTimeIST(row.closesAt)
+      : tab === "platform"
+        ? row.closesAt
+          ? state === "MISSED"
+            ? `Submissions closed ${formatDateTimeIST(row.closesAt)}`
+            : `Submissions close ${formatDateTimeIST(row.closesAt)}`
+          : "No deadline"
         : `Received ${formatDateIST(row.assignedAt)}`;
 
   return (
@@ -370,14 +375,7 @@ function Row({ row, tab, now }: { row: AttemptListRow; tab: Tab; now: Date }) {
         ) : null}
       </div>
 
-      <p className="text-sm text-[#4B4B4B]">
-        <span className="text-[#8F8F8F] md:hidden">
-          {tab === "platform" && state !== "SUBMITTED" && state !== "MISSED"
-            ? "Due "
-            : ""}
-        </span>
-        {when}
-      </p>
+      <p className="text-sm text-[#4B4B4B]">{when}</p>
 
       <div className="md:text-right">
         {s.action ? (

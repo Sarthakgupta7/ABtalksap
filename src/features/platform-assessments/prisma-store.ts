@@ -7,6 +7,7 @@ import { questionCreateNested } from "@/features/recruiter-assessments/prisma-st
 import type { AssessmentQuestionRow } from "@/features/recruiter-assessments/service";
 import { cohortSlugForDomain } from "@/repositories/ids";
 import { listAllEvents } from "@/repositories/workshop";
+import { formatDateIST } from "@/lib/date-utils";
 import {
   DOMAIN_LABELS,
   type AudienceOptions,
@@ -90,6 +91,29 @@ const LIVE_USER = {
   deletedAt: null,
   disabledAt: null,
 } satisfies Prisma.UserWhereInput;
+
+const ISO_DAY = /\d{4}-\d{2}-\d{2}/;
+const ACRONYMS = new Set(["ai", "ui", "ux", "ml", "ds"]);
+
+/**
+ * A readable name for a registration whose event is not in the WorkshopEvent
+ * table: `workshop-2026-09-05` → "Workshop · 5 Sep 2026",
+ * `linkedin-ai-interview` → "Linkedin AI Interview".
+ */
+function workshopLabelFromId(id: string): string {
+  const day = id.match(ISO_DAY)?.[0];
+  const words = id
+    .replace(ISO_DAY, "")
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((w) =>
+      ACRONYMS.has(w.toLowerCase())
+        ? w.toUpperCase()
+        : w[0].toUpperCase() + w.slice(1),
+    );
+  const name = words.join(" ") || "Workshop";
+  return day ? `${name} · ${formatDateIST(new Date(day))}` : name;
+}
 
 export function prismaPlatformStore(): PlatformStore {
   return {
@@ -303,7 +327,7 @@ export function prismaPlatformStore(): PlatformStore {
             actionType: "PLATFORM_ASSESSMENT_SENT",
             reason: "Platform assessment published and sent",
             newState: {
-              deadlineAt: input.deadlineAt.toISOString(),
+              deadlineAt: input.deadlineAt?.toISOString() ?? null,
               audience: input.audience,
               assigned,
             },
@@ -387,6 +411,153 @@ export function prismaPlatformStore(): PlatformStore {
       }));
     },
 
+    async countStarted(assessmentId) {
+      return prisma.recruiterAssessmentAssignment.count({
+        where: { assessmentId, status: { not: "ASSIGNED" } },
+      });
+    },
+
+    async applySentEdit(input) {
+      return writeClient().$transaction(
+        async (tx) => {
+          const row = await tx.recruiterAssessment.findFirst({
+            where: { id: input.assessmentId, ...PLATFORM, status: "PUBLISHED" },
+            select: {
+              deadlineAt: true,
+              audienceAll: true,
+              audienceDomains: true,
+              audienceWorkshopEventIds: true,
+            },
+          });
+          if (!row) return { ok: false as const, reason: "NOT_SENT" as const };
+
+          const audienceData = {
+            deadlineAt: input.deadlineAt,
+            audienceAll: input.audience.all,
+            audienceDomains: input.audience.domains,
+            audienceWorkshopEventIds: input.audience.workshopEventIds,
+          };
+
+          if (input.change.mode === "FULL") {
+            // Re-checked inside the transaction: a start that landed after the
+            // service looked means answers may exist, so the tree must stay.
+            const started = await tx.recruiterAssessmentAssignment.count({
+              where: {
+                assessmentId: input.assessmentId,
+                status: { not: "ASSIGNED" },
+              },
+            });
+            if (started > 0)
+              return { ok: false as const, reason: "STARTED" as const };
+            const c = input.change.content;
+            await tx.recruiterAssessment.update({
+              where: { id: input.assessmentId },
+              data: {
+                ...audienceData,
+                title: c.title,
+                subheading: c.subheading,
+                instructions: c.instructions,
+                durationMinutes: c.durationMinutes,
+                passMarkPercent: c.passMarkPercent,
+                cameraRequired: c.cameraRequired,
+                questions: {
+                  deleteMany: {},
+                  create: c.questions.map((q, i) => questionCreateNested(q, i)),
+                },
+              },
+              select: { id: true },
+            });
+          } else {
+            // Wording only: update text in place, keeping every question and
+            // option id, so saved answers and results stay attached.
+            const w = input.change.wording;
+            const questions = await tx.assessmentQuestion.findMany({
+              where: { assessmentId: input.assessmentId },
+              orderBy: { position: "asc" },
+              select: {
+                id: true,
+                options: { orderBy: { position: "asc" }, select: { id: true } },
+              },
+            });
+            for (let i = 0; i < questions.length; i++) {
+              const next = w.questions[i];
+              if (!next) continue;
+              await tx.assessmentQuestion.update({
+                where: { id: questions[i].id },
+                data: {
+                  title: next.title,
+                  helpText: next.helpText,
+                  ...(next.uploadDestinationUrl !== null
+                    ? { uploadDestinationUrl: next.uploadDestinationUrl }
+                    : {}),
+                },
+                select: { id: true },
+              });
+              for (let j = 0; j < questions[i].options.length; j++) {
+                const body = next.options[j];
+                if (body === undefined) continue;
+                await tx.assessmentQuestionOption.update({
+                  where: { id: questions[i].options[j].id },
+                  data: { body },
+                  select: { id: true },
+                });
+              }
+            }
+            await tx.recruiterAssessment.update({
+              where: { id: input.assessmentId },
+              data: {
+                ...audienceData,
+                title: w.title,
+                subheading: w.subheading,
+                instructions: w.instructions,
+              },
+              select: { id: true },
+            });
+          }
+
+          let added = 0;
+          for (let i = 0; i < input.newRecipientIds.length; i += INSERT_CHUNK) {
+            const chunk = input.newRecipientIds.slice(i, i + INSERT_CHUNK);
+            const res = await tx.recruiterAssessmentAssignment.createMany({
+              data: chunk.map((candidateUserId) => ({
+                assessmentId: input.assessmentId,
+                candidateUserId,
+                candidateRef: `PLATFORM:${candidateUserId}`,
+                assignedAt: input.at,
+              })),
+              skipDuplicates: true,
+            });
+            added += res.count;
+          }
+
+          await writeAudit(tx, {
+            actorUserId: input.actorUserId,
+            adminUserId: input.actorUserId,
+            entityType: "RecruiterAssessment",
+            entityId: input.assessmentId,
+            actionType: "PLATFORM_ASSESSMENT_EDITED",
+            reason:
+              input.change.mode === "FULL"
+                ? "Sent platform assessment edited before anyone started"
+                : "Sent platform assessment wording edited",
+            previousState: {
+              deadlineAt: row.deadlineAt?.toISOString() ?? null,
+              audience: audienceOf(row),
+            },
+            newState: {
+              mode: input.change.mode,
+              deadlineAt: input.deadlineAt?.toISOString() ?? null,
+              audience: input.audience,
+              added,
+            },
+          });
+
+          return { ok: true as const, added };
+        },
+        { timeout: 60_000, maxWait: 10_000 },
+      );
+    },
+
     async audienceOptions(): Promise<AudienceOptions> {
       const [allCount, byCohort, byWorkshop, events] = await Promise.all([
         prisma.candidateProfile.count({ where: { user: LIVE_USER } }),
@@ -424,8 +595,10 @@ export function prismaPlatformStore(): PlatformStore {
           const event = eventsById.get(w.eventId);
           return {
             eventId: w.eventId,
-            label: event ? `${event.title} · ${event.date}` : w.eventId,
-            date: event?.date ?? "",
+            label: event
+              ? `${event.title} · ${formatDateIST(new Date(event.date))}`
+              : workshopLabelFromId(w.eventId),
+            date: event?.date ?? w.eventId.match(ISO_DAY)?.[0] ?? "",
             count: w._count._all,
           };
         })

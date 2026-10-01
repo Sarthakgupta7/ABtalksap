@@ -53,7 +53,7 @@ export default async function AssessmentAttemptPage({ params }: Props) {
           <section className="rounded-xl border bg-card px-6 py-10 text-center">
             <h1 className="font-display text-2xl font-semibold">{loaded.data.view.title}</h1>
             <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
-              The deadline for this assessment passed
+              Submissions closed
               {loaded.data.closesAt ? ` on ${formatDateTimeIST(loaded.data.closesAt)}` : ""}.
               It wasn&apos;t started, so there&apos;s nothing to submit.
             </p>
@@ -62,9 +62,9 @@ export default async function AssessmentAttemptPage({ params }: Props) {
           <>
             {loaded.data.closesAt && loaded.data.status !== "SUBMITTED" ? (
               <p className="mb-4 text-sm text-muted-foreground">
-                From ABTalks · Due {formatDateTimeIST(loaded.data.closesAt)}. If you&apos;ve
-                started and it&apos;s still open at the deadline, the answers you saved are
-                submitted automatically.
+                From ABTalks · Submissions close {formatDateTimeIST(loaded.data.closesAt)}. If you&apos;ve
+                started and it&apos;s still open when submissions close, the answers you
+                saved are submitted automatically.
               </p>
             ) : null}
             <AssessmentAttempt

@@ -153,7 +153,11 @@ async function PlatformTab() {
                       : describeAudience(row.audience)}
                   </td>
                   <td className="px-5 py-3 text-[#787878]">
-                    {row.deadlineAt ? formatDateTimeIST(row.deadlineAt) : "—"}
+                    {row.deadlineAt
+                      ? formatDateTimeIST(row.deadlineAt)
+                      : row.status === "DRAFT"
+                        ? "—"
+                        : "No deadline"}
                   </td>
                   <td className="px-5 py-3 tabular-nums">
                     {row.status === "DRAFT"

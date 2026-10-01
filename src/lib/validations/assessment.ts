@@ -162,10 +162,31 @@ export const createAndSendPlatformSchema = z.object({
   draft: assessmentDraftSchema,
   audience: platformAudienceSchema,
   /** ISO timestamp. Checked against the server clock in the service. */
-  deadlineAt: z.string().datetime({ offset: true, message: "Set a deadline" }),
+  /** ISO timestamp, or null for no deadline. Checked against the server clock. */
+  deadlineAt: z
+    .string()
+    .datetime({ offset: true, message: "Set a deadline" })
+    .nullable(),
 });
 
 export type CreateAndSendPlatformInput = z.infer<typeof createAndSendPlatformSchema>;
+
+/**
+ * Editing a SENT platform assessment. `audience` is the full audience after
+ * the edit — it may add groups, never remove them (checked in the service).
+ */
+export const editSentPlatformSchema = z.object({
+  assessmentId: z.string().min(1).max(64),
+  draft: assessmentDraftSchema,
+  audience: platformAudienceSchema,
+  /** ISO timestamp, or null for no deadline. Checked against the server clock. */
+  deadlineAt: z
+    .string()
+    .datetime({ offset: true, message: "Set a deadline" })
+    .nullable(),
+});
+
+export type EditSentPlatformInput = z.infer<typeof editSentPlatformSchema>;
 
 // ---------------------------------------------------------------------------
 // T-218 (plan 129) — candidate answers. Shared by the candidate screen and the

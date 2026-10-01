@@ -34,6 +34,8 @@ export type ImportRowView = {
   costMicroUsd: number;
   linkedExisting: boolean;
   createdAtIso: string;
+  /** Admin-gated file route when a blob is stored. Never a blob pathname. */
+  downloadHref: string | null;
 };
 
 export type ImportStatusView = {
@@ -76,6 +78,9 @@ export async function loadImportStatus(input: {
       costMicroUsd: r.costMicroUsd,
       linkedExisting: r.linkedExisting,
       createdAtIso: r.createdAt.toISOString(),
+      downloadHref: r.hasFile
+        ? `/api/admin/resume-imports/${r.id}/file`
+        : null,
     })),
     nextCursor: list.nextCursor,
     counts,

@@ -646,7 +646,18 @@ function ImportRow({
         <input type="checkbox" aria-label={`Select ${row.originalFilename}`} checked={selected} onChange={onToggle} />
       </td>
       <td className="max-w-[220px] truncate px-2 py-2 align-top font-medium text-[#353535]" title={row.originalFilename}>
-        {row.originalFilename}
+        {row.downloadHref ? (
+          <a
+            className="text-[#03535F] underline"
+            href={row.downloadHref}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {row.originalFilename}
+          </a>
+        ) : (
+          row.originalFilename
+        )}
       </td>
       <td className="px-2 py-2 align-top text-[#353535]">
         {row.status === "NEEDS_REVIEW" ? (

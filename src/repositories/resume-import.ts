@@ -212,6 +212,8 @@ export type ImportListRow = {
   costMicroUsd: number;
   linkedExisting: boolean;
   createdAt: Date;
+  /** True when a private blob pathname is stored. Never expose the pathname. */
+  hasFile: boolean;
 };
 
 export async function listImports(input: {
@@ -264,11 +266,33 @@ export async function listImports(input: {
       costMicroUsd: true,
       linkedExisting: true,
       createdAt: true,
+      blobPathname: true,
     },
   });
   const hasMore = rows.length > take;
   const page = hasMore ? rows.slice(0, take) : rows;
-  return { rows: page, nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null };
+  return {
+    rows: page.map(({ blobPathname, ...row }) => ({
+      ...row,
+      hasFile: blobPathname != null && blobPathname.length > 0,
+    })),
+    nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
+  };
+}
+
+/**
+ * Resolve a stored import PDF for an admin download. Pathname stays
+ * server-side — callers never pass or receive a blob path from the client.
+ */
+export async function getImportFilePath(
+  importId: string,
+): Promise<{ pathname: string; fileName: string } | null> {
+  const row = await prisma.resumeImport.findUnique({
+    where: { id: importId },
+    select: { blobPathname: true, originalFilename: true },
+  });
+  if (!row?.blobPathname) return null;
+  return { pathname: row.blobPathname, fileName: row.originalFilename };
 }
 
 export async function countImportsByStatus(): Promise<Record<ResumeImportStatus, number>> {

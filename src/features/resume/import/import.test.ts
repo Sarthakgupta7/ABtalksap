@@ -983,6 +983,64 @@ async function main() {
     assert(src("src/components/dashboard-hub/profile-review-banner.tsx").includes('href="/profile"'), "links to profile");
   });
 
+  /* ─── Plan 171 — clickable import filenames ────────────────────────────── */
+  console.log("\nPlan 171 — admin import file open");
+
+  const importFileRoute = "src/app/api/admin/resume-imports/[id]/file/route.ts";
+  const importFileRouteSrc = src(importFileRoute)
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+  await suite("import file route is gated by getAdminContext, never requireAdmin", () => {
+    assert(importFileRouteSrc.includes("getAdminContext()"), "does not call getAdminContext");
+    assert(!importFileRouteSrc.includes("requireAdmin"), "uses requireAdmin");
+    assert(importFileRouteSrc.includes("{ status: 403 }"), "no 403 for a non-admin");
+  });
+
+  await suite("import file route resolves pathname server-side from import id only", () => {
+    assert(importFileRouteSrc.includes("paramsSchema"), "param not validated");
+    assert(importFileRouteSrc.includes("safeParse"), "no Zod parse");
+    assert(!importFileRouteSrc.includes("searchParams"), "reads a query parameter");
+    assert(
+      !/pathname:\s*(raw|parsed|params|input)/.test(importFileRouteSrc),
+      "caller-supplied blob pathname reaches storage",
+    );
+    assert(
+      importFileRouteSrc.includes("getImportFilePath(id)"),
+      "pathname not resolved from import row",
+    );
+  });
+
+  await suite("import file route serves inline, private, audited", () => {
+    assert(
+      importFileRouteSrc.includes('"content-disposition": `inline; filename='),
+      "not served inline for new-tab open",
+    );
+    assert(
+      importFileRouteSrc.includes('"cache-control": "private, no-store"'),
+      "not private no-store",
+    );
+    assert(
+      importFileRouteSrc.includes('actionType: "DOWNLOAD_RESUME_IMPORT"'),
+      "no stable audit action type",
+    );
+    assert(importFileRouteSrc.includes('entityType: "ResumeImport"'), "wrong entity type");
+  });
+
+  await suite("list DTO exposes downloadHref only, never blobPathname", () => {
+    const status = src("src/features/resume/import/status.ts");
+    assert(status.includes("downloadHref:"), "no downloadHref on ImportRowView");
+    assert(
+      status.includes("`/api/admin/resume-imports/${r.id}/file`"),
+      "downloadHref does not point at the import file route",
+    );
+    assert(!status.includes("blobPathname"), "status DTO leaks blobPathname");
+    const table = src("src/app/admin/resume-imports/import-table.tsx");
+    assert(table.includes("row.downloadHref"), "table does not use downloadHref");
+    assert(table.includes('target="_blank"'), "link does not open in a new tab");
+    assert(!table.includes("blobPathname"), "table leaks blobPathname");
+  });
+
   console.log(`\n${passed} passed, ${failed} failed`);
   if (failed > 0) process.exit(1);
   process.exit(0);

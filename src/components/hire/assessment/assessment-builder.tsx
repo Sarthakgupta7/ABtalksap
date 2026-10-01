@@ -499,9 +499,9 @@ export function AssessmentBuilder({
             </>
           ) : (
             <>
-              <p className="hire-assess__kicker">
-                {platform ? "Platform assessment" : "Assessment builder"}
-              </p>
+              {platform ? null : (
+                <p className="hire-assess__kicker">Assessment builder</p>
+              )}
               <h1>{heading}</h1>
               <p className="hire-assess__sub">
                 {platform

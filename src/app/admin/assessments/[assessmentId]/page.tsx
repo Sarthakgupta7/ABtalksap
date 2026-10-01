@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Pencil } from "lucide-react";
 import { requireAdmin } from "@/lib/admin-auth";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { PlatformAssessmentDeleteButton } from "@/components/admin/platform-assessment-delete-button";
 import { PlatformBuilderFrame } from "@/components/admin/platform-builder-frame";
 import { AssessmentBuilder } from "@/components/hire/assessment/assessment-builder";
-import type { AssessmentDraft } from "@/components/hire/assessment/assessment-types";
-import { MAX_PARAGRAPH_WORDS } from "@/lib/validations/assessment";
+import { buttonVariants } from "@/components/ui/button";
 import { prismaAttemptStore } from "@/features/assessment-attempts/prisma-store";
 import {
   endReasonCopy,
@@ -15,7 +15,7 @@ import {
 import {
   describeAudience,
   getPlatformMonitor,
-  type PlatformAssessmentRow,
+  rowToBuilderDraft,
   type PlatformAttemptRow,
 } from "@/features/platform-assessments/service";
 import { prismaPlatformStore } from "@/features/platform-assessments/prisma-store";
@@ -28,51 +28,6 @@ type Props = {
   params: Promise<{ assessmentId: string }>;
   searchParams: Promise<{ page?: string }>;
 };
-
-/** The stored draft in the builder's shape — per type, no extra keys. */
-function rowToDraft(row: PlatformAssessmentRow): AssessmentDraft {
-  return {
-    assessmentId: row.id,
-    title: row.title,
-    subheading: row.subheading,
-    instructions: row.instructions,
-    durationMinutes: row.durationMinutes,
-    passMarkPercent: row.passMarkPercent,
-    cameraRequired: row.cameraRequired,
-    shortlistRefs: [],
-    questions: row.questions.map((q) => {
-      const base = {
-        title: q.title,
-        helpText: q.helpText,
-        isRequired: q.isRequired,
-        points: q.points,
-      };
-      if (q.type === "MULTIPLE_CHOICE") {
-        return {
-          ...base,
-          type: "MULTIPLE_CHOICE" as const,
-          allowMultipleCorrect: q.allowMultipleCorrect,
-          options: q.options.map((o) => ({
-            body: o.body,
-            isCorrect: o.isCorrect,
-          })),
-        };
-      }
-      if (q.type === "PARAGRAPH") {
-        return {
-          ...base,
-          type: "PARAGRAPH" as const,
-          maxWords: q.maxWords ?? MAX_PARAGRAPH_WORDS,
-        };
-      }
-      return {
-        ...base,
-        type: "FILE_UPLOAD" as const,
-        uploadDestinationUrl: q.uploadDestinationUrl ?? "",
-      };
-    }),
-  };
-}
 
 export default async function AdminPlatformAssessmentPage({
   params,
@@ -104,7 +59,7 @@ export default async function AdminPlatformAssessmentPage({
         <PlatformBuilderFrame>
           <AssessmentBuilder
             candidates={[]}
-            existingDraft={rowToDraft(row)}
+            existingDraft={rowToBuilderDraft(row)}
             platform={{ audienceOptions }}
           />
         </PlatformBuilderFrame>
@@ -155,16 +110,25 @@ export default async function AdminPlatformAssessmentPage({
         title={row.title}
         description={row.subheading ?? undefined}
         actions={
-          <span
-            className={cn(
-              "rounded-full px-3 py-1 text-xs font-semibold",
-              closed
-                ? "bg-[#F4F4F4] text-[#4B4B4B]"
-                : "bg-[#18D39B]/10 text-[#197E23]",
-            )}
-          >
-            {closed ? "Closed" : "Live"}
-          </span>
+          <>
+            <span
+              className={cn(
+                "rounded-full px-3 py-1 text-xs font-semibold",
+                closed
+                  ? "bg-[#F4F4F4] text-[#4B4B4B]"
+                  : "bg-[#18D39B]/10 text-[#197E23]",
+              )}
+            >
+              {closed ? "Closed" : "Live"}
+            </span>
+            <Link
+              href={`/admin/assessments/${row.id}/edit`}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              <Pencil aria-hidden="true" />
+              Edit assessment
+            </Link>
+          </>
         }
       />
 

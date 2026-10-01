@@ -7,10 +7,12 @@ import { logger } from "@/lib/logger";
 import {
   assessmentDraftSchema,
   createAndSendPlatformSchema,
+  editSentPlatformSchema,
 } from "@/lib/validations/assessment";
 import {
   createPublishAndSend,
   deletePlatformDraft,
+  editSentAssessment,
   savePlatformDraft,
 } from "@/features/platform-assessments/service";
 import { prismaPlatformStore } from "@/features/platform-assessments/prisma-store";
@@ -149,5 +151,49 @@ export async function createAndSendPlatformAssessmentAction(
   } catch (error) {
     logger.error("[admin-assessment-actions] send", { error: String(error) });
     return { ok: false, message: "Failed to send assessment" };
+  }
+}
+
+/**
+ * Edit a SENT assessment: anything until someone starts, then wording only;
+ * the deadline can move and groups can be added (never removed).
+ */
+export async function editSentPlatformAssessmentAction(
+  input: unknown,
+): Promise<
+  | ActionOk<{ id: string; mode: "FULL" | "WORDING"; added: number }>
+  | ActionErr
+> {
+  const admin = await requireAdmin();
+
+  const parsed = editSentPlatformSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: parsed.error.issues[0]?.message ?? "Invalid assessment",
+    };
+  }
+
+  try {
+    const result = await editSentAssessment(
+      prismaPlatformStore(),
+      admin.userId,
+      parsed.data,
+    );
+    if (!result.ok) {
+      return { ok: false, message: result.message, status: statusFor(result.code) };
+    }
+    logger.info("[admin-assessment-actions] edited", {
+      assessmentId: result.data.id,
+      mode: result.data.mode,
+      added: result.data.added,
+      adminUserId: admin.userId,
+    });
+    revalidate(result.data.id);
+    revalidatePath("/assessments");
+    return { ok: true, data: result.data };
+  } catch (error) {
+    logger.error("[admin-assessment-actions] edit", { error: String(error) });
+    return { ok: false, message: "Failed to save changes" };
   }
 }

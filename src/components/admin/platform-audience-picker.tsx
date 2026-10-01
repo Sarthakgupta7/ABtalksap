@@ -31,6 +31,11 @@ type Props = {
   deadlineLocal: string;
   onDeadlineChange: (next: string) => void;
   disabled: boolean;
+  /**
+   * Editing a sent assessment: the groups that already received it. They show
+   * ticked and can't be unticked; more groups can be added.
+   */
+  lockedAudience?: PlatformAudienceValue;
 };
 
 /** A `datetime-local` value (IST wall clock) → ISO instant. */
@@ -38,6 +43,11 @@ export function istLocalToIso(local: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(local)) return null;
   const d = new Date(`${local}:00+05:30`);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+/** An ISO instant → the `datetime-local` value for it on the IST wall clock. */
+export function isoToIstLocal(iso: string): string {
+  return formatInTimeZone(new Date(iso), IST, "yyyy-MM-dd'T'HH:mm");
 }
 
 /** The default deadline: 7 days from now, 11:59 PM IST. */
@@ -78,8 +88,10 @@ export function PlatformAudiencePicker({
   deadlineLocal,
   onDeadlineChange,
   disabled,
+  lockedAudience,
 }: Props) {
   const minLocal = formatInTimeZone(new Date(), IST, "yyyy-MM-dd'T'HH:mm");
+  const locked = lockedAudience ?? null;
 
   return (
     <section
@@ -90,9 +102,9 @@ export function PlatformAudiencePicker({
         <h2 id="assess-audience-heading">Who gets this assessment</h2>
       </div>
       <p className="hire-assess-hint">
-        Create publishes the assessment and gives it to everyone in these groups
-        right now. People who join a group later won&apos;t receive it. It shows
-        up in the Platform tab of their Assessments page.
+        {locked
+          ? "Ticked groups already have this assessment and can't be removed. Tick more groups to send it to them too. Anyone who already has it doesn't get a second copy."
+          : "Create publishes the assessment and gives it to everyone in these groups right now. People who join a group later won't receive it. It shows up in the Platform tab of their Assessments page."}
       </p>
 
       <fieldset className="hire-assess-assign__fieldset" disabled={disabled}>
@@ -103,11 +115,15 @@ export function PlatformAudiencePicker({
               <input
                 type="checkbox"
                 checked={audience.all}
+                disabled={locked?.all}
                 onChange={(e) =>
                   onAudienceChange({
                     ...audience,
                     all: e.target.checked,
-                    domains: [],
+                    // Domains a sent assessment already went to must stay.
+                    domains: e.target.checked
+                      ? (locked?.domains ?? [])
+                      : audience.domains,
                   })
                 }
               />
@@ -143,6 +159,7 @@ export function PlatformAudiencePicker({
                 <input
                   type="checkbox"
                   checked={audience.all || audience.domains.includes(d.domain)}
+                  disabled={locked?.domains.includes(d.domain)}
                   onChange={() =>
                     onAudienceChange({
                       ...audience,
@@ -178,6 +195,7 @@ export function PlatformAudiencePicker({
                   <input
                     type="checkbox"
                     checked={audience.workshopEventIds.includes(w.eventId)}
+                    disabled={locked?.workshopEventIds.includes(w.eventId)}
                     onChange={() =>
                       onAudienceChange({
                         ...audience,
@@ -215,6 +233,9 @@ export function PlatformAudiencePicker({
           After this, the assessment closes. Anyone mid-attempt is submitted
           automatically with the answers they saved. Anyone who never started is
           marked as missed.
+          {locked
+            ? " Moving it later reopens the assessment for anyone who hasn't submitted yet."
+            : null}
         </span>
       </label>
     </section>

@@ -1,9 +1,11 @@
 import "server-only";
 
 import {
+  MAX_PARAGRAPH_WORDS,
   MAX_PLATFORM_DEADLINE_DAYS,
   assessmentDraftSchema,
   createAndSendPlatformSchema,
+  editSentPlatformSchema,
   type AssessmentDraftInput,
   type AssessmentEndReason,
 } from "@/lib/validations/assessment";
@@ -109,6 +111,33 @@ export type PublishInput = {
   at: Date;
 };
 
+/** Plan 166 edit: new text for a sent assessment, matched by position. */
+export type WordingInput = {
+  title: string;
+  subheading: string | null;
+  instructions: string | null;
+  questions: {
+    title: string;
+    helpText: string | null;
+    uploadDestinationUrl: string | null;
+    options: string[];
+  }[];
+};
+
+export type SentEditInput = {
+  assessmentId: string;
+  actorUserId: string;
+  at: Date;
+  deadlineAt: Date;
+  /** The full audience after the edit (a superset of the old one). */
+  audience: PlatformAudience;
+  /** Users the added groups cover; existing recipients are skipped. */
+  newRecipientIds: string[];
+  change:
+    | { mode: "FULL"; content: ContentInput }
+    | { mode: "WORDING"; wording: WordingInput };
+};
+
 export type PlatformStore = {
   create(createdByUserId: string, input: ContentInput): Promise<{ id: string }>;
   /** DRAFT-guarded. False when the row is missing or no longer a draft. */
@@ -135,6 +164,17 @@ export type PlatformStore = {
     page: { skip: number; take: number },
   ): Promise<PlatformAttemptRow[]>;
   audienceOptions(): Promise<AudienceOptions>;
+  /** Recipients who have started (or finished) — any answer may exist. */
+  countStarted(assessmentId: string): Promise<number>;
+  /**
+   * One transaction: content or wording, deadline, audience, new recipients,
+   * audit row. FULL is refused (`STARTED`) if anyone started meanwhile.
+   */
+  applySentEdit(
+    input: SentEditInput,
+  ): Promise<
+    { ok: true; added: number } | { ok: false; reason: "NOT_SENT" | "STARTED" }
+  >;
 };
 
 type Code = "NOT_FOUND" | "INVALID" | "CONFLICT";
@@ -159,6 +199,29 @@ export const DOMAIN_LABELS: Record<ChallengeDomain, string> = {
   SE: "Software Engineering",
   CLAUDE: "Claude",
 };
+
+const GRADEABLE_MSG =
+  "Add at least one multiple-choice question worth points — the pass mark is measured on those.";
+
+/** Why a deadline is refused, or null when it is fine. */
+function deadlineProblem(deadlineAt: Date, now: Date): string | null {
+  if (deadlineAt.getTime() < now.getTime() + MIN_DEADLINE_LEAD_MS) {
+    return "Set a deadline at least 15 minutes from now.";
+  }
+  if (
+    deadlineAt.getTime() >
+    now.getTime() + MAX_PLATFORM_DEADLINE_DAYS * 86_400_000
+  ) {
+    return "Set a deadline within the next year.";
+  }
+  return null;
+}
+
+function isGradeable(draft: AssessmentDraftInput): boolean {
+  return draft.questions.some(
+    (q) => q.type === "MULTIPLE_CHOICE" && q.points > 0,
+  );
+}
 
 function toContent(input: AssessmentDraftInput): ContentInput {
   return {
@@ -186,6 +249,51 @@ export function describeAudience(audience: PlatformAudience): string {
   const w = audience.workshopEventIds.length;
   if (w > 0) parts.push(`${w} workshop${w === 1 ? "" : "s"}`);
   return parts.join(" + ") || "—";
+}
+
+/** The stored draft in the builder's shape — per type, no extra keys. */
+export function rowToBuilderDraft(row: PlatformAssessmentRow): AssessmentDraftInput {
+  return {
+    assessmentId: row.id,
+    title: row.title,
+    subheading: row.subheading,
+    instructions: row.instructions,
+    durationMinutes: row.durationMinutes,
+    passMarkPercent: row.passMarkPercent,
+    cameraRequired: row.cameraRequired,
+    shortlistRefs: [],
+    questions: row.questions.map((q) => {
+      const base = {
+        title: q.title,
+        helpText: q.helpText,
+        isRequired: q.isRequired,
+        points: q.points,
+      };
+      if (q.type === "MULTIPLE_CHOICE") {
+        return {
+          ...base,
+          type: "MULTIPLE_CHOICE" as const,
+          allowMultipleCorrect: q.allowMultipleCorrect,
+          options: q.options.map((o) => ({
+            body: o.body,
+            isCorrect: o.isCorrect,
+          })),
+        };
+      }
+      if (q.type === "PARAGRAPH") {
+        return {
+          ...base,
+          type: "PARAGRAPH" as const,
+          maxWords: q.maxWords ?? MAX_PARAGRAPH_WORDS,
+        };
+      }
+      return {
+        ...base,
+        type: "FILE_UPLOAD" as const,
+        uploadDestinationUrl: q.uploadDestinationUrl ?? "",
+      };
+    }),
+  };
 }
 
 export async function savePlatformDraft(
@@ -289,25 +397,10 @@ export async function createPublishAndSend(
   });
 
   const deadlineAt = new Date(parsed.data.deadlineAt);
-  if (deadlineAt.getTime() < now.getTime() + MIN_DEADLINE_LEAD_MS) {
-    return fail("INVALID", "Set a deadline at least 15 minutes from now.");
-  }
-  if (
-    deadlineAt.getTime() >
-    now.getTime() + MAX_PLATFORM_DEADLINE_DAYS * 86_400_000
-  ) {
-    return fail("INVALID", "Set a deadline within the next year.");
-  }
+  const badDeadline = deadlineProblem(deadlineAt, now);
+  if (badDeadline) return fail("INVALID", badDeadline);
   // The pass mark is a share of auto-gradeable points — same rule as recruiters.
-  const gradeable = draft.questions.some(
-    (q) => q.type === "MULTIPLE_CHOICE" && q.points > 0,
-  );
-  if (!gradeable) {
-    return fail(
-      "INVALID",
-      "Add at least one multiple-choice question worth points — the pass mark is measured on those.",
-    );
-  }
+  if (!isGradeable(draft)) return fail("INVALID", GRADEABLE_MSG);
 
   const candidateUserIds = await store.resolveAudience(audience);
   if (candidateUserIds.length === 0) {
@@ -339,6 +432,175 @@ export async function createPublishAndSend(
     return fail("CONFLICT", "This assessment has already been sent.", id);
   }
   return { ok: true, data: { id, assigned: out.assigned } };
+}
+
+// ---------------------------------------------------------------------------
+// Editing a sent assessment.
+//
+// Until anyone starts, everything can change (no answers exist yet). After the
+// first start, only wording can: question/option text, help text, upload link,
+// title, subheading, instructions. Type, points, required, correct options,
+// option count, word cap, order, time limit, pass mark and camera are fixed,
+// so no candidate's answers or result shift underneath them. The deadline can
+// always move (at least 15 minutes out) and groups can be added, never removed.
+// ---------------------------------------------------------------------------
+
+/** What changed in the structure, in words — or null when only text changed. */
+export function structureChange(
+  row: PlatformAssessmentRow,
+  draft: AssessmentDraftInput,
+): string | null {
+  if (draft.durationMinutes !== row.durationMinutes) return "the time limit";
+  if (draft.passMarkPercent !== row.passMarkPercent) return "the pass mark";
+  if (draft.cameraRequired !== row.cameraRequired) return "the camera setting";
+  if (draft.questions.length !== row.questions.length) {
+    return "the number of questions";
+  }
+  for (let i = 0; i < draft.questions.length; i++) {
+    const d = draft.questions[i];
+    const r = row.questions[i];
+    const n = `question ${i + 1}`;
+    if (d.type !== r.type) return `${n}'s type`;
+    if (d.points !== r.points) return `${n}'s points`;
+    if (d.isRequired !== r.isRequired) return `whether ${n} is required`;
+    if (d.type === "MULTIPLE_CHOICE") {
+      if (d.allowMultipleCorrect !== r.allowMultipleCorrect) {
+        return `${n}'s answer type`;
+      }
+      if (d.options.length !== r.options.length) return `${n}'s options`;
+      if (d.options.some((o, j) => o.isCorrect !== r.options[j]?.isCorrect)) {
+        return `${n}'s correct answer`;
+      }
+    }
+    if (
+      d.type === "PARAGRAPH" &&
+      d.maxWords !== (r.maxWords ?? MAX_PARAGRAPH_WORDS)
+    ) {
+      return `${n}'s word cap`;
+    }
+  }
+  return null;
+}
+
+function removesGroup(
+  before: PlatformAudience,
+  after: PlatformAudience,
+): boolean {
+  return (
+    (before.all && !after.all) ||
+    before.domains.some((d) => !after.domains.includes(d)) ||
+    before.workshopEventIds.some((w) => !after.workshopEventIds.includes(w))
+  );
+}
+
+/** Only the groups the edit adds. */
+export function addedGroups(
+  before: PlatformAudience,
+  after: PlatformAudience,
+): PlatformAudience {
+  return {
+    all: after.all && !before.all,
+    domains: after.domains.filter((d) => !before.domains.includes(d)),
+    workshopEventIds: after.workshopEventIds.filter(
+      (w) => !before.workshopEventIds.includes(w),
+    ),
+  };
+}
+
+export async function editSentAssessment(
+  store: PlatformStore,
+  adminUserId: string,
+  input: unknown,
+  now: Date = new Date(),
+): Promise<
+  Result<{ id: string; mode: "FULL" | "WORDING"; added: number }>
+> {
+  const parsed = editSentPlatformSchema.safeParse(input);
+  if (!parsed.success) {
+    return FAIL(
+      "INVALID",
+      parsed.error.issues[0]?.message ?? "Invalid assessment",
+    );
+  }
+  const { assessmentId, draft, audience } = parsed.data;
+
+  const row = await store.find(assessmentId);
+  if (!row) return FAIL("NOT_FOUND", "Assessment not found");
+  if (row.status !== "PUBLISHED") {
+    return FAIL("CONFLICT", "Only a sent assessment can be edited here.");
+  }
+
+  const deadlineAt = new Date(parsed.data.deadlineAt);
+  const badDeadline = deadlineProblem(deadlineAt, now);
+  if (badDeadline) return FAIL("INVALID", badDeadline);
+
+  if (removesGroup(row.audience, audience)) {
+    return FAIL(
+      "INVALID",
+      "Groups that already received this assessment can't be removed.",
+    );
+  }
+
+  const started = await store.countStarted(assessmentId);
+  let change: SentEditInput["change"];
+  if (started === 0) {
+    if (!isGradeable(draft)) return FAIL("INVALID", GRADEABLE_MSG);
+    change = { mode: "FULL", content: toContent(draft) };
+  } else {
+    const what = structureChange(row, draft);
+    if (what) {
+      return FAIL(
+        "CONFLICT",
+        `${started} candidate${started === 1 ? " has" : "s have"} started, so ${what} can't change. You can still fix wording, move the deadline and add groups.`,
+      );
+    }
+    change = {
+      mode: "WORDING",
+      wording: {
+        title: draft.title,
+        subheading: draft.subheading ?? null,
+        instructions: draft.instructions ?? null,
+        questions: draft.questions.map((q) => ({
+          title: q.title,
+          helpText: q.helpText ?? null,
+          uploadDestinationUrl:
+            q.type === "FILE_UPLOAD" ? q.uploadDestinationUrl : null,
+          options:
+            q.type === "MULTIPLE_CHOICE" ? q.options.map((o) => o.body) : [],
+        })),
+      },
+    };
+  }
+
+  const added = addedGroups(row.audience, audience);
+  const hasAdded =
+    added.all || added.domains.length > 0 || added.workshopEventIds.length > 0;
+  const newRecipientIds = hasAdded ? await store.resolveAudience(added) : [];
+  if (newRecipientIds.length > MAX_PLATFORM_RECIPIENTS) {
+    return FAIL(
+      "INVALID",
+      `The added groups have more than ${MAX_PLATFORM_RECIPIENTS.toLocaleString("en-IN")} people. Narrow them down.`,
+    );
+  }
+
+  const out = await store.applySentEdit({
+    assessmentId,
+    actorUserId: adminUserId,
+    at: now,
+    deadlineAt,
+    audience,
+    newRecipientIds,
+    change,
+  });
+  if (!out.ok) {
+    return out.reason === "STARTED"
+      ? FAIL(
+          "CONFLICT",
+          "A candidate started while you were editing, so only wording can change now. Reload and try again.",
+        )
+      : FAIL("CONFLICT", "Only a sent assessment can be edited here.");
+  }
+  return OK({ id: assessmentId, mode: change.mode, added: out.added });
 }
 
 export const MONITOR_PAGE_SIZE = 50;

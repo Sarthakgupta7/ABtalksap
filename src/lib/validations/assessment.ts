@@ -167,6 +167,19 @@ export const createAndSendPlatformSchema = z.object({
 
 export type CreateAndSendPlatformInput = z.infer<typeof createAndSendPlatformSchema>;
 
+/**
+ * Editing a SENT platform assessment. `audience` is the full audience after
+ * the edit — it may add groups, never remove them (checked in the service).
+ */
+export const editSentPlatformSchema = z.object({
+  assessmentId: z.string().min(1).max(64),
+  draft: assessmentDraftSchema,
+  audience: platformAudienceSchema,
+  deadlineAt: z.string().datetime({ offset: true, message: "Set a deadline" }),
+});
+
+export type EditSentPlatformInput = z.infer<typeof editSentPlatformSchema>;
+
 // ---------------------------------------------------------------------------
 // T-218 (plan 129) — candidate answers. Shared by the candidate screen and the
 // server so the two can never disagree about what counts as an answer.

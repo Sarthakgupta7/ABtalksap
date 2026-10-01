@@ -99,7 +99,7 @@ export function SixtyDayGrid({ cells }: { cells: ActivityCell[] }) {
     <section aria-label="Your last 60 days">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#008C94]">Your 60 days</p>
       <p className="mt-1.5 font-heading text-[32px] font-bold leading-none text-black">
-        {done} <span className="font-medium text-[#6B7280]">of 60</span>
+        {done} <span className="font-medium text-[#6B7280]">active days of 60</span>
       </p>
       <p className="mt-1.5 text-sm text-[#1F1F1F]">Active days across all your tracks</p>
 

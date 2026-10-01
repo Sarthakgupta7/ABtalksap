@@ -510,6 +510,7 @@ export function RecruiterOnboardingWizard({
             key="welcome"
             motion={stepMotion}
             focusHeading={focusHeading}
+            offerSignIn={offerSignIn}
             onStart={() => go("identity", 1)}
           />
         );
@@ -651,11 +652,13 @@ export function RecruiterOnboardingWizard({
   // The rail's jump-back is only unsafe once the ACCOUNT exists — a signed-in
   // recruiter still filling in their company may freely step back.
   const offerSignIn = !accountExists && !session;
+  // On welcome, Sign in sits beside "Set up workspace" — skip the header duplicate.
+  const showHeaderSignIn = offerSignIn && screen !== "welcome";
 
   return (
     <OnboardingShell
       aside={
-        !offerSignIn ? null : (
+        !showHeaderSignIn ? null : (
           <p className="text-sm text-[#626262]">
             <span className="hidden sm:inline">Already have an account? </span>
             <Link href="/recruiter-onboarding/signin" className={TEXT_LINK}>

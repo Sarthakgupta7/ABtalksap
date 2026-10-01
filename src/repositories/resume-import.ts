@@ -218,10 +218,35 @@ export async function listImports(input: {
   status?: ResumeImportStatus;
   cursor?: string;
   take?: number;
+  /** Matches file name or email, case-insensitive. */
+  search?: string;
+  /** `YYYY-MM-DD`: only imports created on that day in IST. */
+  date?: string;
 }): Promise<{ rows: ImportListRow[]; nextCursor: string | null }> {
   const take = Math.min(Math.max(input.take ?? 100, 1), 200);
+  const search = input.search?.trim();
+  const dayStart = input.date ? new Date(`${input.date}T00:00:00+05:30`) : null;
   const rows = await prisma.resumeImport.findMany({
-    where: input.status ? { status: input.status } : {},
+    where: {
+      ...(input.status ? { status: input.status } : {}),
+      ...(search
+        ? {
+            OR: [
+              { originalFilename: { contains: search, mode: "insensitive" as const } },
+              { normalizedEmail: { contains: search, mode: "insensitive" as const } },
+              { sourceEmail: { contains: search, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+      ...(dayStart
+        ? {
+            createdAt: {
+              gte: dayStart,
+              lt: new Date(dayStart.getTime() + 24 * 60 * 60 * 1000),
+            },
+          }
+        : {}),
+    },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: take + 1,
     ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),

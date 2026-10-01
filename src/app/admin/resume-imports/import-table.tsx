@@ -81,6 +81,22 @@ function usd(micro: number): string {
   return dollars < 0.01 && dollars > 0 ? "< $0.01" : `$${dollars.toFixed(2)}`;
 }
 
+// IST with an explicit zone, so the server render and the browser agree.
+const IMPORTED_DATE = new Intl.DateTimeFormat("en-IN", {
+  timeZone: "Asia/Kolkata",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+const IMPORTED_TIME = new Intl.DateTimeFormat("en-IN", {
+  timeZone: "Asia/Kolkata",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
+const SEARCH_DEBOUNCE_MS = 300;
+
 function compact(n: number): string {
   return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k` : String(n);
 }
@@ -95,6 +111,8 @@ export function ImportTable({
   const [view, setView] = useState<ImportStatusView>(initial);
   const [extraRows, setExtraRows] = useState<ImportRowView[]>([]);
   const [filter, setFilter] = useState<Status | "ALL">("ALL");
+  const [search, setSearch] = useState("");
+  const [date, setDate] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [autoRegister, setAutoRegister] = useState(false);
   const [consent, setConsent] = useState(false);
@@ -109,13 +127,28 @@ export function ImportTable({
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const active = inFlight > 0 || view.workerRunning || rows.some((r) => r.registerRequested);
 
-  const load = useCallback(async (status: Status | "ALL") => {
-    const res = await getImportStatusAction({ status: status === "ALL" ? undefined : status });
-    if (res.ok) {
-      setView(res.data);
-      setExtraRows([]);
-    }
-  }, []);
+  // Search and date are applied on the server: the table is paged, so
+  // filtering only the loaded rows would miss most imports.
+  const query = useCallback(
+    (status: Status | "ALL", cursor?: string) => ({
+      status: status === "ALL" ? undefined : status,
+      cursor,
+      search: search.trim() || undefined,
+      date: date || undefined,
+    }),
+    [search, date],
+  );
+
+  const load = useCallback(
+    async (status: Status | "ALL") => {
+      const res = await getImportStatusAction(query(status));
+      if (res.ok) {
+        setView(res.data);
+        setExtraRows([]);
+      }
+    },
+    [query],
+  );
   const refresh = useCallback(() => load(filter), [load, filter]);
 
   // Poll while anything is moving. (A filter change fetches in its handler.)
@@ -125,12 +158,25 @@ export function ImportTable({
     return () => clearInterval(t);
   }, [active, refresh]);
 
+  // Re-query when the search text (after a pause in typing) or date changes.
+  const firstQuery = useRef(true);
+  useEffect(() => {
+    if (firstQuery.current) {
+      firstQuery.current = false;
+      return;
+    }
+    const t = setTimeout(() => {
+      setSelected(new Set());
+      void refresh();
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+    // `refresh` changes whenever search/date do; keying on those two is enough.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, date]);
+
   async function loadMore() {
     if (!view.nextCursor) return;
-    const res = await getImportStatusAction({
-      status: filter === "ALL" ? undefined : filter,
-      cursor: view.nextCursor,
-    });
+    const res = await getImportStatusAction(query(filter, view.nextCursor));
     if (res.ok) {
       setExtraRows((prev) => [...prev, ...res.data.rows]);
       setView((v) => ({ ...v, nextCursor: res.data.nextCursor }));
@@ -441,26 +487,57 @@ export function ImportTable({
       <section className="overflow-hidden rounded-xl border border-[#E9E9E9] bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E9E9E9] px-5 py-3">
           <h2 className="font-display text-lg font-semibold text-[#353535]">Imports</h2>
-          <select
-            className="rounded-md border border-[#E9E9E9] bg-white px-2 py-1 text-sm"
-            value={filter}
-            onChange={(e) => {
-              const next = e.target.value as Status | "ALL";
-              setSelected(new Set());
-              setFilter(next);
-              void load(next);
-            }}
-          >
-            <option value="ALL">All statuses</option>
-            {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
-              <option key={s} value={s}>
-                {STATUS_LABEL[s]} ({counts[s]})
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="search"
+              aria-label="Search imports by file name or email"
+              placeholder="Search file name or email"
+              className="w-56 rounded-md border border-[#E9E9E9] bg-white px-2 py-1 text-sm"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <input
+              type="date"
+              aria-label="Imported on (IST)"
+              className="rounded-md border border-[#E9E9E9] bg-white px-2 py-1 text-sm"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+            {(search || date) && (
+              <button
+                type="button"
+                className="text-xs text-[#787878] underline-offset-2 hover:underline"
+                onClick={() => {
+                  setSearch("");
+                  setDate("");
+                }}
+              >
+                Clear
+              </button>
+            )}
+            <select
+              className="rounded-md border border-[#E9E9E9] bg-white px-2 py-1 text-sm"
+              value={filter}
+              onChange={(e) => {
+                const next = e.target.value as Status | "ALL";
+                setSelected(new Set());
+                setFilter(next);
+                void load(next);
+              }}
+            >
+              <option value="ALL">All statuses</option>
+              {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
+                <option key={s} value={s}>
+                  {STATUS_LABEL[s]} ({counts[s]})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         {rows.length === 0 ? (
-          <p className="px-5 py-8 text-sm text-[#787878]">No résumés here yet.</p>
+          <p className="px-5 py-8 text-sm text-[#787878]">
+            {search || date ? "No imports match your search." : "No résumés here yet."}
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -478,6 +555,7 @@ export function ImportTable({
                   </th>
                   <th className="px-2 py-2">File</th>
                   <th className="px-2 py-2">Email</th>
+                  <th className="whitespace-nowrap px-2 py-2">Imported (IST)</th>
                   <th className="px-2 py-2">Status</th>
                   <th className="px-2 py-2">Score</th>
                   <th className="px-2 py-2">Details</th>
@@ -600,6 +678,12 @@ function ImportRow({
         ) : (
           (row.email ?? <span className="text-[#8F8F8F]">—</span>)
         )}
+      </td>
+      <td className="whitespace-nowrap px-2 py-2 align-top text-[#353535]">
+        {IMPORTED_DATE.format(new Date(row.createdAtIso))}
+        <span className="block text-xs text-[#8F8F8F]">
+          {IMPORTED_TIME.format(new Date(row.createdAtIso))}
+        </span>
       </td>
       <td className="px-2 py-2 align-top">
         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[row.status]}`}>

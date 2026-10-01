@@ -16383,3 +16383,45 @@ a.hire-credits:hover { border-color: var(--h-primary); }
     transition: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Pending navigation row (plan 168)
+ *
+ * <NavLink> renders a `.nav-pending` marker while its own navigation is in
+ * flight, so `:has()` lets the row style itself without the sidebar tracking
+ * any state. The top progress bar says "something is loading"; this says which
+ * row you clicked, which is what you are actually looking at.
+ * ------------------------------------------------------------------------- */
+.hire-app .hire-side__item:has(.nav-pending),
+.hire-app .hire-side__row:has(.nav-pending) {
+  opacity: 0.72;
+}
+
+.hire-app .hire-side__item:has(.nav-pending)::after,
+.hire-app .hire-side__row:has(.nav-pending)::after {
+  content: "";
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-inline-start: auto;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  opacity: 0.8;
+  animation: hire-side-spin 620ms linear infinite;
+}
+
+@keyframes hire-side-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hire-app .hire-side__item:has(.nav-pending)::after,
+  .hire-app .hire-side__row:has(.nav-pending)::after {
+    animation: none;
+    border-top-color: currentColor;
+    opacity: 0.45;
+  }
+}

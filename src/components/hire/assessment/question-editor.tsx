@@ -248,6 +248,9 @@ export function QuestionEditor({
                     onChange({ ...question, options });
                   }}
                   placeholder={`Option ${oi + 1}`}
+                  // Options sit outside .hire-assess-field (13px), so they fell
+                  // back to the browser's 16px; match the other inputs.
+                  style={{ fontSize: 13 }}
                 />
                 {fixed ? null : (
                   <button

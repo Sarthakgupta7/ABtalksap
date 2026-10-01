@@ -671,18 +671,15 @@ export function AssessmentBuilder({
                   stretch the checkbox like a text input. */}
               <div className="hire-assess-setting flex flex-col gap-1.5">
                 <span className="text-[13px] font-semibold text-[#626262]">Camera</span>
-                <label
-                  className="hire-assess-setting--toggle"
-                  style={{ alignItems: "center", minHeight: 42, padding: "10px 8px", borderRadius: 10 }}
-                >
+                {/* Plain checkbox like "Untimed", centred on the input row. */}
+                <label className="hire-assess-check" style={{ minHeight: 42 }}>
                   <input
                     type="checkbox"
                     checked={cameraRequired}
                     disabled={wordingOnly}
                     onChange={(e) => setCameraRequired(e.target.checked)}
-                    style={{ marginTop: 0 }}
                   />
-                  <span className="hire-assess-setting__label">Require camera</span>
+                  <span>Require camera</span>
                 </label>
               </div>
             </div>

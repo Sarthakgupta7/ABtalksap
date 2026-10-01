@@ -79,6 +79,9 @@ type StageSwitcherProps = {
 export function StageSwitcher({ stages, current, panels, profileScore }: StageSwitcherProps) {
   const profileDone = profileScore >= 100;
   const [selected, setSelected] = useState<StageKey>(current);
+  /** Bumped on every tile click while the profile is unfinished: the pin
+      can't leave the start, so it bounces and says so. */
+  const [nudge, setNudge] = useState(0);
   const railRef = useRef<HTMLDivElement>(null);
 
   const openFromHash = useCallback(() => {
@@ -114,6 +117,7 @@ export function StageSwitcher({ stages, current, panels, profileScore }: StageSw
 
   const choose = (s: StageSummary) => {
     setSelected(s.key);
+    if (!profileDone) setNudge((n) => n + 1);
     window.history.replaceState(null, "", `#${s.anchor}`);
   };
 
@@ -185,7 +189,7 @@ export function StageSwitcher({ stages, current, panels, profileScore }: StageSw
             })}
           </div>
 
-          <StageRoad stages={stages} selected={selected} profileDone={profileDone} />
+          <StageRoad stages={stages} selected={selected} profileDone={profileDone} nudge={nudge} />
         </div>
       </div>
 
@@ -231,11 +235,14 @@ function StageRoad({
   stages,
   selected,
   profileDone,
+  nudge,
 }: {
   stages: StageSummary[];
   selected: StageKey;
   /** Until the profile is complete the pin waits at the start (under it). */
   profileDone: boolean;
+  /** Changes when a tile is clicked with the profile unfinished. */
+  nudge: number;
 }) {
   const target = profileDone ? PIN_STOPS[selected] : PROFILE_STOP;
   const [pin, setPin] = useState({ x: target, hop: 0 });
@@ -275,6 +282,7 @@ function StageRoad({
 
   const label = stages.find((s) => s.key === selected);
   return (
+    <>
     <div className="relative mt-1 hidden xl:block" style={{ height: ROAD_H }}>
       <svg className="absolute inset-0 block size-full overflow-visible" viewBox={`0 0 1000 ${ROAD_H}`} preserveAspectRatio="none" aria-hidden="true">
         <path d={ROAD_D} fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="6" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
@@ -300,20 +308,47 @@ function StageRoad({
           style={{ transform: `translate(-50%, -50%) scale(${1 - pin.hop / 14})` }}
           aria-hidden="true"
         />
-        <svg
-          viewBox="0 0 24 32"
-          className="absolute left-0 top-0 h-8 w-6 drop-shadow-[0_3px_4px_rgba(3,40,45,0.35)]"
-          style={{ transform: `translate(-50%, calc(-100% - ${pin.hop}px))` }}
-          aria-hidden="true"
-        >
-          <path d="M12 31 C 12 31 2 19 2 11.5 A 10 10 0 0 1 22 11.5 C 22 19 12 31 12 31 Z" fill="#03535F" stroke="#fff" strokeWidth="1.5" />
-          <circle cx="12" cy="11.5" r="4" fill="#2BD4A0" />
-        </svg>
+        {/* Keyed on nudge so each blocked click replays the bounce. */}
+        <span key={nudge} className={cn("absolute left-0 top-0", nudge > 0 && "pin-stuck")}>
+          <svg
+            viewBox="0 0 24 32"
+            className="absolute left-0 top-0 h-8 w-6 drop-shadow-[0_3px_4px_rgba(3,40,45,0.35)]"
+            style={{ transform: `translate(-50%, calc(-100% - ${pin.hop}px))` }}
+            aria-hidden="true"
+          >
+            <path d="M12 31 C 12 31 2 19 2 11.5 A 10 10 0 0 1 22 11.5 C 22 19 12 31 12 31 Z" fill="#03535F" stroke="#fff" strokeWidth="1.5" />
+            <circle cx="12" cy="11.5" r="4" fill="#2BD4A0" />
+          </svg>
+        </span>
       </span>
+
     </div>
+
+    {/* Thought bubble when the pin is stuck. It gets its own room: this slot
+        opens below the road, holds, then closes, so the bubble never sits on
+        top of anything. Pure CSS, keyed on nudge to replay; hovering pauses
+        it so the link can be clicked. */}
+    {nudge > 0 && !profileDone ? (
+      <div key={nudge} className="pin-thought-slot relative hidden overflow-hidden xl:block" role="status">
+        <div className="absolute top-0" style={{ left: `${pin.x / 10}%` }}>
+          <span className="absolute left-[2px] top-[4px] size-2 rounded-full bg-white shadow-[0_1px_4px_rgba(3,40,45,0.25)]" aria-hidden="true" />
+          <span className="absolute left-[10px] top-[13px] size-3 rounded-full bg-white shadow-[0_1px_4px_rgba(3,40,45,0.25)]" aria-hidden="true" />
+          <p className="absolute left-[16px] top-[26px] whitespace-nowrap rounded-full bg-white px-5 py-2.5 text-sm text-[#1F1F1F] shadow-[0_6px_16px_-6px_rgba(3,40,45,0.4)]">
+            <span className="font-heading font-bold text-[#C62D1F]">Oh nooo!!</span>{" "}I can&apos;t move forward till
+            you complete your profile.{" "}
+            <Link
+              href="/profile"
+              className="font-semibold text-[#03535F] underline decoration-[1.5px] underline-offset-4 hover:decoration-2"
+            >
+              Do that now →
+            </Link>
+          </p>
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 }
-
 /* ─── Complete your profile (first tile; links to /profile) ────
    Incomplete: a warm red alert tile with a pulsing dot to pull the eye.
    Complete: calm white with a check in the corner and "100% completed". */

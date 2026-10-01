@@ -5,14 +5,7 @@ import { logger } from "@/lib/logger";
 import { getBalance } from "@/repositories/points";
 import { getCandidateDetail } from "@/repositories/candidate-detail";
 import { listQuizCatalog } from "@/repositories/learning";
-import { listPassedChallengeDays, listQuizAttemptsForUser } from "@/repositories/progress";
-import { formatInTimeZone } from "date-fns-tz";
-import {
-  IST,
-  addCalendarDaysToKey,
-  getElapsedDayNumber,
-} from "@/lib/date-utils";
-import type { ActivityCell } from "@/features/dashboard/get-activity-heatmap";
+import { listQuizAttemptsForUser } from "@/repositories/progress";
 import { getResumeView } from "@/features/resume/service";
 import {
   computeCompleteness,
@@ -34,13 +27,7 @@ import type { HubEnrollment } from "@/features/dashboard/get-hub-data";
 /** A weekly quiz counts as passed at this share of questions correct. */
 export const QUIZ_PASS_RATIO = 0.6;
 
-/** One square of the 60-day grid. `level` 1–5 drives an active square's shade. */
-export type SixtyDay =
-  | { day: number; status: "active"; level: 1 | 2 | 3 | 4 | 5 }
-  | { day: number; status: "missed" | "future" };
-
 export type StageData = {
-  sixty: SixtyDay[];
   synergyPoints: number;
   profile: {
     score: number;
@@ -150,25 +137,6 @@ async function loadHackathon(userId: string): Promise<StageData["hackathon"]> {
  * submission count), past and not passed → missed, the rest → future.
  * Today stays "future" until it's passed.
  */
-async function loadSixty(
-  enrollment: HubEnrollment | null,
-  cells: ActivityCell[],
-): Promise<SixtyDay[]> {
-  if (!enrollment) return [];
-  const passed = new Set(await listPassedChallengeDays(enrollment.id));
-  const today = getElapsedDayNumber(enrollment.startedAt);
-  const startKey = formatInTimeZone(enrollment.startedAt, IST, "yyyy-MM-dd");
-  const levelByDate = new Map(cells.map((c) => [c.date, c.level]));
-  return Array.from({ length: 60 }, (_, i): SixtyDay => {
-    const day = i + 1;
-    if (passed.has(day)) {
-      const heat = levelByDate.get(addCalendarDaysToKey(startKey, i)) ?? 0;
-      return { day, status: "active", level: (Math.min(4, heat) + 1) as 1 | 2 | 3 | 4 | 5 };
-    }
-    return { day, status: day < today ? "missed" : "future" };
-  });
-}
-
 async function loadAssessments(userId: string): Promise<StageData["assessments"]> {
   const listed = await listCandidateAttempts(prismaAttemptStore(), userId);
   const pending = listed.ok
@@ -180,12 +148,9 @@ async function loadAssessments(userId: string): Promise<StageData["assessments"]
 export async function getStageData(
   userId: string,
   enrollments: HubEnrollment[],
-  cells: ActivityCell[],
 ): Promise<StageData> {
-  const primary = enrollments.find((e) => e.status === "ACTIVE") ?? enrollments[0] ?? null;
-  const [sixty, synergyPoints, profile, mock, quiz, hackathon, assessments] =
+  const [synergyPoints, profile, mock, quiz, hackathon, assessments] =
     await Promise.all([
-      loadSixty(primary, cells).catch(degrade("60-day grid", [] as SixtyDay[])),
       getBalance(userId).catch(degrade("synergy points", 0)),
       loadProfile(userId).catch(
         degrade("profile strength", { score: 0, sections: [], openToWork: false, skills: [] }),
@@ -204,5 +169,5 @@ export async function getStageData(
       ),
       loadAssessments(userId).catch(degrade("assessments", { pending: 0 })),
     ]);
-  return { sixty, synergyPoints, profile, mock, quiz, hackathon, assessments };
+  return { synergyPoints, profile, mock, quiz, hackathon, assessments };
 }

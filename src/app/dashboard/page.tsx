@@ -16,7 +16,7 @@ import {
   testMilestones,
 } from "@/components/dashboard-hub/stages/test-skills-panel";
 import { GetHiredPanel } from "@/components/dashboard-hub/stages/get-hired-panel";
-import { getStageData, type SixtyDay } from "@/features/dashboard/get-stage-data";
+import { getStageData } from "@/features/dashboard/get-stage-data";
 import type { DashboardJob } from "@/components/dashboard-hub/stages/get-hired-panel";
 import { formatPostedLabel } from "@/components/jobs/job-ui";
 import { prismaApplicationStore } from "@/features/candidate-jobs/prisma-store";
@@ -80,7 +80,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   // ever reach the dashboard.
   const jobDeps = { jobs: prismaJobStore(), applications: prismaApplicationStore() };
   const [loadedStage, browsed, mine] = await Promise.all([
-    getStageData(session.user.id, data.enrollments, data.heatmap.cells),
+    getStageData(session.user.id, data.enrollments),
     browsePublishedJobs(jobDeps),
     listMyApplications(jobDeps, { userId: session.user.id }),
   ]);
@@ -88,9 +88,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const jobsNow = new Date();
   const rawJobs = browsed.ok ? browsed.data : [];
 
-  const enrolledStage = previewEnrolled
-    ? { ...loadedStage, sixty: PREVIEW_SIXTY }
-    : loadedStage;
+  const enrolledStage = loadedStage;
   // Dev only: DASHBOARD_PREVIEW_PROFILE_COMPLETE=1 shows a 100% profile.
   const previewProfileDone =
     process.env.NODE_ENV !== "production" &&
@@ -217,7 +215,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                 build: (
                   <>
                   <BuildSkillsPanel
-                    sixty={stageData.sixty}
                     trackHref={trackHref}
                     enrollments={data.enrollments}
                     joinedDomains={data.joinedDomains}
@@ -262,16 +259,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 }
 
 /* ─── Dev preview: pretend to be enrolled (DASHBOARD_PREVIEW_ENROLLED=1) ── */
-
-const PREVIEW_LEVELS = [5, 3, 1, 4, 1, 3, 1, 3, 3, 5, 4, 3, 3] as const;
-
-const PREVIEW_SIXTY: SixtyDay[] = Array.from({ length: 60 }, (_, i): SixtyDay =>
-  i < 13
-    ? { day: i + 1, status: "active", level: PREVIEW_LEVELS[i] }
-    : i === 13
-      ? { day: 14, status: "missed" }
-      : { day: i + 1, status: "future" },
-);
 
 function withPreviewEnrollment(data: HubData): HubData {
   return {

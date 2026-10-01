@@ -5,7 +5,6 @@ import { PROGRAM_AI_COHORT_BASE } from "@/features/program/constants";
 import type { HubEnrollment } from "@/features/dashboard/get-hub-data";
 import type { ActivityStreak } from "@/features/dashboard/compute-activity-streak";
 import type { ActivityHeatmap as HeatmapData } from "@/features/dashboard/get-activity-heatmap";
-import type { SixtyDay } from "@/features/dashboard/get-stage-data";
 import { ContinueLearning, ProgressCard } from "./build-progress";
 import { Library, type LibraryArt, type LibraryItem } from "./library";
 import { TrackCards } from "./track-cards";
@@ -29,7 +28,6 @@ const TRACKS: {
 
 
 type BuildSkillsPanelProps = {
-  sixty: SixtyDay[];
   /** Primary track page (or /challenges) — Continue / Start again target. */
   trackHref: string;
   enrollments: HubEnrollment[];
@@ -65,16 +63,16 @@ export function BuildSkillsPanel(props: BuildSkillsPanelProps) {
         <>
           <div className="grid gap-5 md:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
             <ContinueLearning enrollments={enrollments} />
-            <ProgressCard
-              sixty={props.sixty}
-              primary={primary}
-              totalSubmissions={props.heatmap.totalSubmissionsInWindow}
-              streak={streak}
-            />
+            <ProgressCard heatmap={props.heatmap} streak={streak} />
           </div>
         </>
       ) : (
-        <TrackCards abandoned={props.abandonedDomains} />
+        <>
+          <TrackCards abandoned={props.abandonedDomains} />
+          {/* No challenge track yet, but activity elsewhere (cohort,
+              Databricks…) still gets its heatmap. */}
+          {props.heatmap.totalActiveDays > 0 ? <ProgressCard heatmap={props.heatmap} streak={streak} /> : null}
+        </>
       )}
 
       <MoreWays {...props} />

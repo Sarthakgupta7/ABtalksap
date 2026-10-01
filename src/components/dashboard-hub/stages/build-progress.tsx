@@ -1,16 +1,16 @@
 import Link from "next/link";
 import type { Domain } from "@prisma/client";
-import type { CSSProperties } from "react";
 import { AlertCircle, ArrowRight, BarChart3, Code2, Flame, Network, Sparkles } from "lucide-react";
-import type { SixtyDay } from "@/features/dashboard/get-stage-data";
+import type { ActivityHeatmap as HeatmapData } from "@/features/dashboard/get-activity-heatmap";
 import type { HubEnrollment } from "@/features/dashboard/get-hub-data";
 import type { ActivityStreak, WeekDayTick } from "@/features/dashboard/compute-activity-streak";
 import { cn } from "@/lib/utils";
+import { ActivityHeatmap } from "@/components/dashboard-hub/activity-heatmap";
 import { STAGE_CARD } from "./stage-ui";
 import "./stages.css";
 
-/* Progress for an enrolled student: the 60-day grid, the streak box and a
-   Continue learning card. Only rendered once they have a track. */
+/* Progress: the activity heatmap (every track and program, last 6 months),
+   the streak box and a Continue learning card. */
 
 export const TRACK_META: Record<Domain, { name: string; blurb: string; path: string; Icon: typeof Code2 }> = {
   SE: { name: "Software Engineering", blurb: "Ship real software, one task a day", path: "/se", Icon: Code2 },
@@ -19,103 +19,28 @@ export const TRACK_META: Record<Domain, { name: string; blurb: string; path: str
   CLAUDE: { name: "Claude", blurb: "Master Claude AI in 60 days", path: "/claude", Icon: Sparkles },
 };
 
-/* ─── Grid squares ────────────────────────────────────────────
-   Active: brand teal #008C94, opacity by intensity (0.2 → 1.0), a soft
-   glassy highlight plus a dark inner shadow (bottom-right) and a light one
-   (top-left). Missed: flat #D9D9DE. Future: white, 1px #D1D9DE inside. */
-
-const ACTIVE_OPACITY = [0, 0.2, 0.4, 0.6, 0.8, 1] as const;
-
-const ACTIVE_SQUARE: CSSProperties = {
-  backgroundColor: "#008C94",
-  backgroundImage:
-    "linear-gradient(135deg, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.08) 38%, rgba(255,255,255,0) 60%)",
-  boxShadow: "inset -2px -2px 4px rgba(0,31,31,0.2), inset 2px 2px 5px rgba(255,255,255,0.25)",
-};
-
-function Square({ d }: { d: SixtyDay }) {
-  if (d.status === "active") {
-    return (
-      <span
-        className="aspect-square rounded-[5px]"
-        style={{ ...ACTIVE_SQUARE, opacity: ACTIVE_OPACITY[d.level] }}
-        title={`Day ${d.day} · done`}
-      />
-    );
-  }
-  if (d.status === "missed") {
-    return <span className="aspect-square rounded-[5px] bg-[#D9D9DE]" title={`Day ${d.day} · missed`} />;
-  }
-  return (
-    <span
-      className="aspect-square rounded-[5px] bg-white shadow-[inset_0_0_0_1px_#D1D9DE]"
-      title={`Day ${d.day}`}
-    />
-  );
-}
-
-export function SixtyDayGrid({
-  sixty,
-  primary,
-  totalSubmissions,
-}: {
-  sixty: SixtyDay[];
-  primary: HubEnrollment;
-  totalSubmissions: number;
-}) {
-  const done = sixty.filter((d) => d.status === "active").length;
-  return (
-    <section aria-label="Your 60 days">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#008C94]">Your 60 days</p>
-      <p className="mt-1.5 font-heading text-[32px] font-bold leading-none text-black">
-        {done} <span className="font-medium text-[#6B7280]">of 60</span>
-      </p>
-      <p className="mt-1.5 text-sm text-[#1F1F1F]">In {TRACK_META[primary.domain].name}</p>
-
-      <div
-        className="sixty-grid mt-4 grid max-w-[560px] gap-1.5"
-        role="img"
-        aria-label={`${done} of 60 days done`}
-      >
-        {sixty.map((d) => (
-          <Square key={d.day} d={d} />
-        ))}
-      </div>
-
-      <div className="mt-3 flex max-w-[560px] flex-wrap items-center justify-between gap-2 text-xs">
-        <span className="text-[#4B4B4B]">
-          {totalSubmissions} {totalSubmissions === 1 ? "submission" : "submissions"} in the last 6 months
-        </span>
-        <span className="flex items-center gap-1.5 font-semibold text-[#4B4B4B]" aria-hidden="true">
-          Less
-          {ACTIVE_OPACITY.slice(1).map((o) => (
-            <span key={o} className="size-3 rounded-[2px]" style={{ ...ACTIVE_SQUARE, opacity: o }} />
-          ))}
-          More
-        </span>
-      </div>
-    </section>
-  );
-}
-
-/** Grid and streak in one card, side by side on wide screens. */
+/** Activity heatmap and streak in one card, side by side on wide screens. */
 export function ProgressCard({
-  sixty,
-  primary,
-  totalSubmissions,
+  heatmap,
   streak,
 }: {
-  sixty: SixtyDay[];
-  primary: HubEnrollment;
-  totalSubmissions: number;
+  heatmap: HeatmapData;
   streak: ActivityStreak;
 }) {
   return (
     <div className={cn(STAGE_CARD, "p-5")}>
       <div className="progress-split grid gap-6 md:items-start md:gap-0">
-      <div className="md:pr-6">
-        <SixtyDayGrid sixty={sixty} primary={primary} totalSubmissions={totalSubmissions} />
-      </div>
+      <section className="min-w-0 md:pr-6" aria-label="Your activity">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#008C94]">Your activity</p>
+        <p className="mt-1.5 font-heading text-[32px] font-bold leading-none text-black">
+          {heatmap.totalActiveDays}{" "}
+          <span className="font-medium text-[#6B7280]">active {heatmap.totalActiveDays === 1 ? "day" : "days"}</span>
+        </p>
+        <p className="mt-1.5 text-sm text-[#1F1F1F]">Across every track and program</p>
+        <div className="mt-3">
+          <ActivityHeatmap cells={heatmap.cells} totalSubmissions={heatmap.totalSubmissionsInWindow} embedded hideTitle />
+        </div>
+      </section>
       <div className="border-t border-[#E9ECEC] pt-6 md:border-l md:border-t-0 md:pl-6 md:pt-0">
         <StreakBox streak={streak} />
       </div>

@@ -505,7 +505,7 @@ export function AssessmentBuilder({
               <h1>{heading}</h1>
               <p className="hire-assess__sub">
                 {platform
-                  ? "Sent by ABTalks to the candidates you choose below"
+                  ? ""
                   : `For ${candidates.length} shortlisted candidate${candidates.length === 1 ? "" : "s"}`}
               </p>
             </>
@@ -666,22 +666,25 @@ export function AssessmentBuilder({
                   />
                 </label>
               </div>
-              <label className="hire-assess-setting hire-assess-setting--toggle">
-                <input
-                  type="checkbox"
-                  checked={cameraRequired}
-                  disabled={wordingOnly}
-                  onChange={(e) => setCameraRequired(e.target.checked)}
-                />
-                <span className="hire-assess-setting__text">
+              {/* Same label-above-control rhythm as Duration and Pass mark, so
+                  the three line up. Not a .hire-assess-field: that class would
+                  stretch the checkbox like a text input. */}
+              <div className="hire-assess-setting flex flex-col gap-1.5">
+                <span className="text-[13px] font-semibold text-[#626262]">Camera</span>
+                <label
+                  className="hire-assess-setting--toggle"
+                  style={{ alignItems: "center", minHeight: 42, padding: "10px 8px", borderRadius: 10 }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={cameraRequired}
+                    disabled={wordingOnly}
+                    onChange={(e) => setCameraRequired(e.target.checked)}
+                    style={{ marginTop: 0 }}
+                  />
                   <span className="hire-assess-setting__label">Require camera</span>
-                  <span className="hire-assess-hint">
-                    Candidates keep their camera on to see the questions.
-                    ABTalks never records or sees the video — only when the
-                    camera is on or off.
-                  </span>
-                </span>
-              </label>
+                </label>
+              </div>
             </div>
           </section>
 
@@ -778,11 +781,7 @@ export function AssessmentBuilder({
                   </button>
                 )}
               </div>
-              <p className="hire-assess-hint">
-                Create publishes this assessment and sends it to the candidates
-                you tick. Each one is notified and finds it on their Assessments
-                page.
-              </p>
+              
               {candidates.length === 0 ? (
                 <p className="hire-assess__send-empty">
                   Your Shortlist is empty. Shortlist candidates on Hire first — you

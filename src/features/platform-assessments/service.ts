@@ -105,7 +105,8 @@ export type AudienceOptions = {
 export type PublishInput = {
   assessmentId: string;
   actorUserId: string;
-  deadlineAt: Date;
+  /** Null = no deadline. */
+  deadlineAt: Date | null;
   audience: PlatformAudience;
   candidateUserIds: string[];
   at: Date;
@@ -128,7 +129,8 @@ export type SentEditInput = {
   assessmentId: string;
   actorUserId: string;
   at: Date;
-  deadlineAt: Date;
+  /** Null = no deadline. */
+  deadlineAt: Date | null;
   /** The full audience after the edit (a superset of the old one). */
   audience: PlatformAudience;
   /** Users the added groups cover; existing recipients are skipped. */
@@ -204,7 +206,8 @@ const GRADEABLE_MSG =
   "Add at least one multiple-choice question worth points — the pass mark is measured on those.";
 
 /** Why a deadline is refused, or null when it is fine. */
-function deadlineProblem(deadlineAt: Date, now: Date): string | null {
+function deadlineProblem(deadlineAt: Date | null, now: Date): string | null {
+  if (deadlineAt === null) return null; // no deadline
   if (deadlineAt.getTime() < now.getTime() + MIN_DEADLINE_LEAD_MS) {
     return "Set a deadline at least 15 minutes from now.";
   }
@@ -396,7 +399,9 @@ export async function createPublishAndSend(
     assessmentId,
   });
 
-  const deadlineAt = new Date(parsed.data.deadlineAt);
+  const deadlineAt = parsed.data.deadlineAt
+    ? new Date(parsed.data.deadlineAt)
+    : null;
   const badDeadline = deadlineProblem(deadlineAt, now);
   if (badDeadline) return fail("INVALID", badDeadline);
   // The pass mark is a share of auto-gradeable points — same rule as recruiters.
@@ -530,7 +535,9 @@ export async function editSentAssessment(
     return FAIL("CONFLICT", "Only a sent assessment can be edited here.");
   }
 
-  const deadlineAt = new Date(parsed.data.deadlineAt);
+  const deadlineAt = parsed.data.deadlineAt
+    ? new Date(parsed.data.deadlineAt)
+    : null;
   const badDeadline = deadlineProblem(deadlineAt, now);
   if (badDeadline) return FAIL("INVALID", badDeadline);
 

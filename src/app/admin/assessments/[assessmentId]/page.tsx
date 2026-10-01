@@ -139,7 +139,7 @@ export default async function AdminPlatformAssessmentPage({
               Deadline
             </dt>
             <dd className="mt-1 text-sm font-medium text-[#353535]">
-              {row.deadlineAt ? formatDateTimeIST(row.deadlineAt) : "—"}
+              {row.deadlineAt ? formatDateTimeIST(row.deadlineAt) : "No deadline"}
               {closed ? " · closed" : ""}
             </dd>
           </div>

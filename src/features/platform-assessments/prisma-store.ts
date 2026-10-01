@@ -7,6 +7,7 @@ import { questionCreateNested } from "@/features/recruiter-assessments/prisma-st
 import type { AssessmentQuestionRow } from "@/features/recruiter-assessments/service";
 import { cohortSlugForDomain } from "@/repositories/ids";
 import { listAllEvents } from "@/repositories/workshop";
+import { formatDateIST } from "@/lib/date-utils";
 import {
   DOMAIN_LABELS,
   type AudienceOptions,
@@ -90,6 +91,29 @@ const LIVE_USER = {
   deletedAt: null,
   disabledAt: null,
 } satisfies Prisma.UserWhereInput;
+
+const ISO_DAY = /\d{4}-\d{2}-\d{2}/;
+const ACRONYMS = new Set(["ai", "ui", "ux", "ml", "ds"]);
+
+/**
+ * A readable name for a registration whose event is not in the WorkshopEvent
+ * table: `workshop-2026-09-05` → "Workshop · 5 Sep 2026",
+ * `linkedin-ai-interview` → "Linkedin AI Interview".
+ */
+function workshopLabelFromId(id: string): string {
+  const day = id.match(ISO_DAY)?.[0];
+  const words = id
+    .replace(ISO_DAY, "")
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((w) =>
+      ACRONYMS.has(w.toLowerCase())
+        ? w.toUpperCase()
+        : w[0].toUpperCase() + w.slice(1),
+    );
+  const name = words.join(" ") || "Workshop";
+  return day ? `${name} · ${formatDateIST(new Date(day))}` : name;
+}
 
 export function prismaPlatformStore(): PlatformStore {
   return {
@@ -303,7 +327,7 @@ export function prismaPlatformStore(): PlatformStore {
             actionType: "PLATFORM_ASSESSMENT_SENT",
             reason: "Platform assessment published and sent",
             newState: {
-              deadlineAt: input.deadlineAt.toISOString(),
+              deadlineAt: input.deadlineAt?.toISOString() ?? null,
               audience: input.audience,
               assigned,
             },
@@ -418,9 +442,13 @@ export function prismaPlatformStore(): PlatformStore {
             // Re-checked inside the transaction: a start that landed after the
             // service looked means answers may exist, so the tree must stay.
             const started = await tx.recruiterAssessmentAssignment.count({
-              where: { assessmentId: input.assessmentId, status: { not: "ASSIGNED" } },
+              where: {
+                assessmentId: input.assessmentId,
+                status: { not: "ASSIGNED" },
+              },
             });
-            if (started > 0) return { ok: false as const, reason: "STARTED" as const };
+            if (started > 0)
+              return { ok: false as const, reason: "STARTED" as const };
             const c = input.change.content;
             await tx.recruiterAssessment.update({
               where: { id: input.assessmentId },
@@ -518,7 +546,7 @@ export function prismaPlatformStore(): PlatformStore {
             },
             newState: {
               mode: input.change.mode,
-              deadlineAt: input.deadlineAt.toISOString(),
+              deadlineAt: input.deadlineAt?.toISOString() ?? null,
               audience: input.audience,
               added,
             },
@@ -567,8 +595,10 @@ export function prismaPlatformStore(): PlatformStore {
           const event = eventsById.get(w.eventId);
           return {
             eventId: w.eventId,
-            label: event ? `${event.title} · ${event.date}` : w.eventId,
-            date: event?.date ?? "",
+            label: event
+              ? `${event.title} · ${formatDateIST(new Date(event.date))}`
+              : workshopLabelFromId(w.eventId),
+            date: event?.date ?? w.eventId.match(ISO_DAY)?.[0] ?? "",
             count: w._count._all,
           };
         })

@@ -162,7 +162,11 @@ export const createAndSendPlatformSchema = z.object({
   draft: assessmentDraftSchema,
   audience: platformAudienceSchema,
   /** ISO timestamp. Checked against the server clock in the service. */
-  deadlineAt: z.string().datetime({ offset: true, message: "Set a deadline" }),
+  /** ISO timestamp, or null for no deadline. Checked against the server clock. */
+  deadlineAt: z
+    .string()
+    .datetime({ offset: true, message: "Set a deadline" })
+    .nullable(),
 });
 
 export type CreateAndSendPlatformInput = z.infer<typeof createAndSendPlatformSchema>;
@@ -175,7 +179,11 @@ export const editSentPlatformSchema = z.object({
   assessmentId: z.string().min(1).max(64),
   draft: assessmentDraftSchema,
   audience: platformAudienceSchema,
-  deadlineAt: z.string().datetime({ offset: true, message: "Set a deadline" }),
+  /** ISO timestamp, or null for no deadline. Checked against the server clock. */
+  deadlineAt: z
+    .string()
+    .datetime({ offset: true, message: "Set a deadline" })
+    .nullable(),
 });
 
 export type EditSentPlatformInput = z.infer<typeof editSentPlatformSchema>;

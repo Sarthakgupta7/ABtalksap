@@ -292,6 +292,18 @@ async function run() {
     assert(!res.ok && res.code === "INVALID", JSON.stringify(res));
   });
 
+  await suite("E6b. no deadline (null) is allowed when editing", async () => {
+    const { store, calls } = fakeStore({ started: 1 });
+    const res = await editSentAssessment(store, "admin", {
+      assessmentId: "pa_1",
+      draft: draft(),
+      audience: AUD({ domains: ["AI"] }),
+      deadlineAt: null,
+    });
+    assert(res.ok, JSON.stringify(res));
+    assert(calls.applied[0]?.deadlineAt === null, "null deadline written");
+  });
+
   await suite("E7. drafts can't be edited through the sent-edit path", async () => {
     const row = { ...sentRow(), status: "DRAFT" as const };
     const { store } = fakeStore({ started: 0, row });

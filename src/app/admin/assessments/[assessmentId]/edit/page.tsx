@@ -21,7 +21,7 @@ export default async function AdminEditSentAssessmentPage({ params }: Props) {
 
   const row = await store.find(assessmentId);
   if (!row) notFound();
-  if (row.status !== "PUBLISHED" || !row.deadlineAt) {
+  if (row.status !== "PUBLISHED") {
     redirect(`/admin/assessments/${assessmentId}`);
   }
 
@@ -47,7 +47,7 @@ export default async function AdminEditSentAssessmentPage({ params }: Props) {
           platform={{
             audienceOptions,
             sent: {
-              deadlineAt: row.deadlineAt.toISOString(),
+              deadlineAt: row.deadlineAt?.toISOString() ?? null,
               audience: row.audience,
               startedCount,
             },

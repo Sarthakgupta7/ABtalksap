@@ -16,6 +16,8 @@ import {
 import {
   PlatformAudiencePicker,
   PlatformDeadlineField,
+  SETTING_HEAD_CLASS,
+  SETTING_LABEL_CLASS,
   audienceEstimate,
   defaultDeadlineLocal,
   isoToIstLocal,
@@ -105,7 +107,8 @@ type Props = {
      * > 0). The deadline can move and groups can be added, never removed.
      */
     sent?: {
-      deadlineAt: string;
+      /** Null = the assessment has no deadline. */
+      deadlineAt: string | null;
       audience: PlatformAudienceValue;
       startedCount: number;
     };
@@ -192,8 +195,17 @@ export function AssessmentBuilder({
     sent?.audience ?? EMPTY_AUDIENCE,
   );
   const [deadlineLocal, setDeadlineLocal] = useState(() =>
-    sent ? isoToIstLocal(sent.deadlineAt) : platform ? defaultDeadlineLocal() : "",
+    sent?.deadlineAt
+      ? isoToIstLocal(sent.deadlineAt)
+      : platform
+        ? defaultDeadlineLocal()
+        : "",
   );
+  // Plan 166: a platform assessment may stay open with no closing date.
+  const [noDeadline, setNoDeadline] = useState(
+    sent !== null && sent.deadlineAt === null,
+  );
+  const deadlineMissing = !noDeadline && !istLocalToIso(deadlineLocal);
   const audienceCount = platform ? audienceEstimate(platform.audienceOptions, audience) : 0;
   const hasAudience =
     audience.all || audience.domains.length > 0 || audience.workshopEventIds.length > 0;
@@ -246,16 +258,16 @@ export function AssessmentBuilder({
   const pickedCount = picked.length;
   const allPicked = candidates.length > 0 && pickedCount === candidates.length;
   const createBlockedReason = sent
-    ? !istLocalToIso(deadlineLocal)
-      ? "Set a deadline."
+    ? deadlineMissing
+      ? "Set a deadline, or tick No deadline."
       : null
     : platform
     ? !hasAudience
       ? "Pick who this assessment goes to."
       : audienceCount === 0
         ? "Nobody is in the groups you picked yet."
-        : !istLocalToIso(deadlineLocal)
-          ? "Set a deadline."
+        : deadlineMissing
+          ? "Set a deadline, or tick No deadline."
           : null
     : candidates.length === 0
       ? "Your Shortlist is empty — shortlist candidates on Hire to send this. You can still save a draft."
@@ -403,10 +415,10 @@ export function AssessmentBuilder({
   }
 
   function createPlatform(draft: AssessmentDraftInput) {
-    const deadlineAt = istLocalToIso(deadlineLocal);
-    if (!deadlineAt) {
+    const deadlineAt = noDeadline ? null : istLocalToIso(deadlineLocal);
+    if (deadlineMissing) {
       setConfirming(false);
-      toast.error("Set a deadline.");
+      toast.error("Set a deadline, or tick No deadline.");
       return;
     }
     setPendingAction("create");
@@ -443,10 +455,10 @@ export function AssessmentBuilder({
   }
 
   function saveSent(draft: AssessmentDraftInput | null = validDraft()) {
-    const deadlineAt = istLocalToIso(deadlineLocal);
-    if (!draft || !deadlineAt || !assessmentId) {
+    const deadlineAt = noDeadline ? null : istLocalToIso(deadlineLocal);
+    if (!draft || deadlineMissing || !assessmentId) {
       setConfirming(false);
-      if (!deadlineAt) toast.error("Set a deadline.");
+      if (deadlineMissing) toast.error("Set a deadline, or tick No deadline.");
       return;
     }
     setPendingAction("create");
@@ -621,10 +633,31 @@ export function AssessmentBuilder({
               Settings
             </h2>
             <div className="hire-assess__settings">
+              {/* Every setting is a heading row (with its checkbox, if any)
+                  above one control, so the columns line up. Checkboxes stay
+                  out of .hire-assess-field, which styles inputs as text boxes. */}
               <div className="hire-assess-setting">
-                <label className="hire-assess-field">
-                  <span>Duration (minutes)</span>
+                <div className={SETTING_HEAD_CLASS}>
+                  <label htmlFor="assess-duration" className={SETTING_LABEL_CLASS}>
+                    Duration (minutes)
+                  </label>
+                  <label className="hire-assess-check">
+                    <input
+                      type="checkbox"
+                      checked={untimed}
+                      disabled={wordingOnly}
+                      onChange={(e) => {
+                        setUntimed(e.target.checked);
+                        if (e.target.checked) setDurationMinutes(null);
+                        else if (durationMinutes == null) setDurationMinutes(30);
+                      }}
+                    />
+                    <span>Untimed</span>
+                  </label>
+                </div>
+                <div className="hire-assess-field">
                   <input
+                    id="assess-duration"
                     type="number"
                     min={1}
                     max={480}
@@ -637,25 +670,17 @@ export function AssessmentBuilder({
                       )
                     }
                   />
-                </label>
-                <label className="hire-assess-check">
-                  <input
-                    type="checkbox"
-                    checked={untimed}
-                    disabled={wordingOnly}
-                    onChange={(e) => {
-                      setUntimed(e.target.checked);
-                      if (e.target.checked) setDurationMinutes(null);
-                      else if (durationMinutes == null) setDurationMinutes(30);
-                    }}
-                  />
-                  <span>Untimed</span>
-                </label>
+                </div>
               </div>
               <div className="hire-assess-setting">
-                <label className="hire-assess-field">
-                  <span>Pass mark (%)</span>
+                <div className={SETTING_HEAD_CLASS}>
+                  <label htmlFor="assess-pass" className={SETTING_LABEL_CLASS}>
+                    Pass percentage
+                  </label>
+                </div>
+                <div className="hire-assess-field">
                   <input
+                    id="assess-pass"
                     type="number"
                     min={0}
                     max={100}
@@ -665,14 +690,12 @@ export function AssessmentBuilder({
                       setPassMarkPercent(Number(e.target.value) || 0)
                     }
                   />
-                </label>
+                </div>
               </div>
-              {/* Same label-above-control rhythm as Duration and Pass mark, so
-                  the three line up. Not a .hire-assess-field: that class would
-                  stretch the checkbox like a text input. */}
-              <div className="hire-assess-setting flex flex-col gap-1.5">
-                <span className="text-[13px] font-semibold text-[#626262]">Camera</span>
-                {/* Plain checkbox like "Untimed", centred on the input row. */}
+              <div className="hire-assess-setting">
+                <div className={SETTING_HEAD_CLASS}>
+                  <span className={SETTING_LABEL_CLASS}>Camera</span>
+                </div>
                 <label className="hire-assess-check" style={{ minHeight: 42 }}>
                   <input
                     type="checkbox"
@@ -688,6 +711,8 @@ export function AssessmentBuilder({
                   <PlatformDeadlineField
                     value={deadlineLocal}
                     onChange={setDeadlineLocal}
+                    noDeadline={noDeadline}
+                    onNoDeadlineChange={setNoDeadline}
                     disabled={pending}
                     sent={sent !== null}
                   />
@@ -835,8 +860,9 @@ export function AssessmentBuilder({
                 ) : platform ? (
                   <p>
                     Publish and send to up to {audienceCount.toLocaleString("en-IN")}{" "}
-                    candidate{audienceCount === 1 ? "" : "s"}? Publishing locks the
-                    questions, the pass mark and the deadline.
+                    candidate{audienceCount === 1 ? "" : "s"}? It goes out now. You
+                    can edit anything until someone starts, then only wording, the
+                    deadline and groups.
                   </p>
                 ) : (
                   <p>

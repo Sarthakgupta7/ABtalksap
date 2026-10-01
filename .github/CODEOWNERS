@@ -101,3 +101,14 @@
 /src/repositories/workshop.ts                       @byteninjaa0
 /src/app/actions/workshop-actions.ts                @byteninjaa0
 /prisma/content/workshop-events.json                @byteninjaa0
+
+# ------------------------------------------------------------------------------
+# 6. Learn / Courses (plan 167)
+#
+# Text-first course reader and course content. Visual components under
+# src/components/course/visuals/ are shared across courses.
+# ------------------------------------------------------------------------------
+/src/app/learn/                                     @zainabshujat
+/src/features/courses/                              @zainabshujat
+/src/components/course/                             @zainabshujat
+/src/components/dashboard-hub/learn-courses.tsx     @zainabshujat

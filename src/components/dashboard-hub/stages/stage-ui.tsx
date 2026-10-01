@@ -75,7 +75,7 @@ export function StageHeader({
         </h2>
         <p className="mt-3 text-[15px] leading-relaxed text-[#4B4B4B]">{sub}</p>
       </div>
-      {aside ? <div className="flex shrink-0 items-center gap-6">{aside}</div> : null}
+      {aside ? <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3">{aside}</div> : null}
     </div>
   );
 }

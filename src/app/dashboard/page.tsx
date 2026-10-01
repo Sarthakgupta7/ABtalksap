@@ -3,8 +3,6 @@ import { auth } from "@/auth";
 import { DashboardShell } from "@/components/dashboard-hub/dashboard-shell";
 import { HeroGreeting } from "@/components/dashboard-hub/hero-greeting";
 import { DaySkySection } from "@/components/dashboard-hub/day-sky";
-import { CareerGuidance } from "@/components/dashboard-hub/career-guidance";
-import { getCareerGuidance } from "@/features/career-guidance/get-career-guidance";
 import { FaqSection } from "@/components/dashboard-hub/faq-section";
 import { STAGE_FAQ } from "@/components/dashboard-hub/faq-content";
 import {
@@ -19,6 +17,11 @@ import {
 } from "@/components/dashboard-hub/stages/test-skills-panel";
 import { GetHiredPanel } from "@/components/dashboard-hub/stages/get-hired-panel";
 import { getStageData, type SixtyDay } from "@/features/dashboard/get-stage-data";
+import type { DashboardJob } from "@/components/dashboard-hub/stages/get-hired-panel";
+import { formatPostedLabel } from "@/components/jobs/job-ui";
+import { prismaApplicationStore } from "@/features/candidate-jobs/prisma-store";
+import { browsePublishedJobs, listMyApplications } from "@/features/candidate-jobs/service";
+import { prismaJobStore } from "@/features/recruiter-jobs/prisma-store";
 import "@/components/dashboard-hub/stages/stages.css";
 import type { HubData } from "@/features/dashboard/get-hub-data";
 import { HUB_CARD_HOVER_CLASS } from "@/components/dashboard-hub/nav-items";
@@ -73,10 +76,18 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     loaded.enrollments.length === 0;
   const data = previewEnrolled ? withPreviewEnrollment(loaded) : loaded;
 
-  const [guidance, loadedStage] = await Promise.all([
-    getCareerGuidance(session.user.id, []),
+  // Jobs go through the candidate read boundary, so only PUBLISHED roles
+  // ever reach the dashboard.
+  const jobDeps = { jobs: prismaJobStore(), applications: prismaApplicationStore() };
+  const [loadedStage, browsed, mine] = await Promise.all([
     getStageData(session.user.id, data.enrollments, data.heatmap.cells),
+    browsePublishedJobs(jobDeps),
+    listMyApplications(jobDeps, { userId: session.user.id }),
   ]);
+  const appliedJobIds = new Set((mine.ok ? mine.data : []).map((a) => a.jobId));
+  const jobsNow = new Date();
+  const rawJobs = browsed.ok ? browsed.data : [];
+
   const enrolledStage = previewEnrolled
     ? { ...loadedStage, sixty: PREVIEW_SIXTY }
     : loadedStage;
@@ -94,6 +105,30 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         },
       }
     : enrolledStage;
+
+  // Best skill match first, then newest. Matching is a case-insensitive name
+  // compare against the skills on the candidate's profile.
+  const mySkills = new Set(stageData.profile.skills.map((x) => x.trim().toLowerCase()));
+  const jobs: DashboardJob[] = rawJobs
+    .map((job) => {
+      const posted = job.publishedAt ?? job.createdAt;
+      return {
+        id: job.id,
+        title: job.title,
+        company: job.company,
+        description: job.description,
+        location: job.location,
+        workMode: job.workMode,
+        type: job.type,
+        skills: job.skills,
+        matched: job.skills.filter((sk) => mySkills.has(sk.trim().toLowerCase())),
+        postedLabel: formatPostedLabel(posted, jobsNow),
+        isNew: jobsNow.getTime() - posted.getTime() < 3 * 86_400_000,
+        applied: appliedJobIds.has(job.id),
+      };
+    })
+    .sort((x, y) => y.matched.length - x.matched.length)
+    .slice(0, 6);
 
   const firstName =
     data.profile?.fullName.split(/\s+/)[0] ??
@@ -212,18 +247,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                 ),
                 hired: (
                   <>
-                  <GetHiredPanel
-                    profile={stageData.profile}
-                    guidance={
-                      <CareerGuidance
-                        userId={session.user.id}
-                        istDay={guidance.istDay}
-                        istWeek={guidance.istWeek}
-                        items={guidance.items}
-                        targeting={guidance.targeting}
-                      />
-                    }
-                  />
+                  <GetHiredPanel profile={stageData.profile} jobs={jobs} />
                   <FaqSection items={STAGE_FAQ.hired} />
                   </>
                 ),

@@ -46,6 +46,8 @@ export type StageData = {
     score: number;
     sections: SectionStatus[];
     openToWork: boolean;
+    /** Skill names on the candidate's profile, for job matching. */
+    skills: string[];
   };
   mock: { completed: number };
   quiz: { passed: boolean; readyHref: string | null };
@@ -67,11 +69,16 @@ async function loadProfile(userId: string): Promise<StageData["profile"]> {
     getCandidateDetail(userId),
     getResumeView(userId).catch(() => null),
   ]);
-  if (!detail) return { score: 0, sections: [], openToWork: false };
+  if (!detail) return { score: 0, sections: [], openToWork: false, skills: [] };
   const { score, sections } = computeCompleteness(detail, {
     hasResume: Boolean(detail.resumeUrl?.trim()) || resume?.status === "READY",
   });
-  return { score, sections, openToWork: detail.preference?.openToWork ?? false };
+  return {
+    score,
+    sections,
+    openToWork: detail.preference?.openToWork ?? false,
+    skills: detail.skills.map((s) => s.name),
+  };
 }
 
 async function loadMock(userId: string): Promise<StageData["mock"]> {
@@ -181,7 +188,7 @@ export async function getStageData(
       loadSixty(primary, cells).catch(degrade("60-day grid", [] as SixtyDay[])),
       getBalance(userId).catch(degrade("synergy points", 0)),
       loadProfile(userId).catch(
-        degrade("profile strength", { score: 0, sections: [], openToWork: false }),
+        degrade("profile strength", { score: 0, sections: [], openToWork: false, skills: [] }),
       ),
       loadMock(userId).catch(degrade("mock interviews", { completed: 0 })),
       loadQuiz(userId, enrollments).catch(

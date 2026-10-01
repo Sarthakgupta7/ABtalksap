@@ -32,9 +32,11 @@
   [data-sidebar="collapsed"] .dash-main { padding-inline: 64px; }
 }
 
+.sixty-grid { grid-template-columns: repeat(10, minmax(0, 1fr)); }
 
 @media (min-width: 768px) {
   .progress-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  [data-sidebar="collapsed"] .sixty-grid { grid-template-columns: repeat(15, minmax(0, 1fr)); }
   [data-sidebar="collapsed"] .progress-split { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
 }
 

@@ -63,16 +63,11 @@ export function BuildSkillsPanel(props: BuildSkillsPanelProps) {
         <>
           <div className="grid gap-5 md:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
             <ContinueLearning enrollments={enrollments} />
-            <ProgressCard heatmap={props.heatmap} streak={streak} />
+            <ProgressCard heatmap={props.heatmap} primary={primary} streak={streak} />
           </div>
         </>
       ) : (
-        <>
-          <TrackCards abandoned={props.abandonedDomains} />
-          {/* No challenge track yet, but activity elsewhere (cohort,
-              Databricks…) still gets its heatmap. */}
-          {props.heatmap.totalActiveDays > 0 ? <ProgressCard heatmap={props.heatmap} streak={streak} /> : null}
-        </>
+        <TrackCards abandoned={props.abandonedDomains} />
       )}
 
       <MoreWays {...props} />

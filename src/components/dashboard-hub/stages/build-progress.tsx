@@ -1,16 +1,18 @@
 import Link from "next/link";
 import type { Domain } from "@prisma/client";
 import { AlertCircle, ArrowRight, BarChart3, Code2, Flame, Network, Sparkles } from "lucide-react";
-import type { ActivityHeatmap as HeatmapData } from "@/features/dashboard/get-activity-heatmap";
+import type { CSSProperties } from "react";
+import { formatInTimeZone } from "date-fns-tz";
+import type { ActivityCell, ActivityHeatmap as HeatmapData } from "@/features/dashboard/get-activity-heatmap";
+import { IST, addCalendarDaysToKey, parseCalendarKeyToUtcDate } from "@/lib/date-utils";
 import type { HubEnrollment } from "@/features/dashboard/get-hub-data";
 import type { ActivityStreak, WeekDayTick } from "@/features/dashboard/compute-activity-streak";
 import { cn } from "@/lib/utils";
-import { ActivityHeatmap } from "@/components/dashboard-hub/activity-heatmap";
 import { STAGE_CARD } from "./stage-ui";
 import "./stages.css";
 
-/* Progress: the activity heatmap (every track and program, last 6 months),
-   the streak box and a Continue learning card. */
+/* Progress for an enrolled student: the 60-day grid, the streak box and a
+   Continue learning card. Only rendered once they have a track. */
 
 export const TRACK_META: Record<Domain, { name: string; blurb: string; path: string; Icon: typeof Code2 }> = {
   SE: { name: "Software Engineering", blurb: "Ship real software, one task a day", path: "/se", Icon: Code2 },
@@ -19,28 +21,125 @@ export const TRACK_META: Record<Domain, { name: string; blurb: string; path: str
   CLAUDE: { name: "Claude", blurb: "Master Claude AI in 60 days", path: "/claude", Icon: Sparkles },
 };
 
-/** Activity heatmap and streak in one card, side by side on wide screens. */
+/* ─── Grid squares ────────────────────────────────────────────
+   The 60 days of the challenge, from its start day (IST). Each square is
+   that day's activity across every track and program, counted and shaded
+   exactly as the activity heatmap does it.
+   Active: brand teal #008C94, opacity by intensity (0.2 → 1.0), a soft
+   glassy highlight plus a dark inner shadow (bottom-right) and a light one
+   (top-left). Missed: flat #D9D9DE. Future: white, 1px #D1D9DE inside. */
+
+const ACTIVE_OPACITY = [0, 0.2, 0.4, 0.6, 0.8, 1] as const;
+
+const ACTIVE_SQUARE: CSSProperties = {
+  backgroundColor: "#008C94",
+  backgroundImage:
+    "linear-gradient(135deg, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.08) 38%, rgba(255,255,255,0) 60%)",
+  boxShadow: "inset -2px -2px 4px rgba(0,31,31,0.2), inset 2px 2px 5px rgba(255,255,255,0.25)",
+};
+
+type GridDay = { day: number; date: string; count: number; level: ActivityCell["level"]; status: "active" | "missed" | "future" };
+
+function squareLabel(d: GridDay): string {
+  const date = formatInTimeZone(parseCalendarKeyToUtcDate(d.date), IST, "d MMM");
+  if (d.status === "future") return `Day ${d.day} · ${date}`;
+  return d.count === 0
+    ? `Day ${d.day} · ${date} · no submissions`
+    : `Day ${d.day} · ${date} · ${d.count} submission${d.count === 1 ? "" : "s"}`;
+}
+
+function Square({ d }: { d: GridDay }) {
+  const label = squareLabel(d);
+  const look =
+    d.status === "active"
+      ? { className: "", style: { ...ACTIVE_SQUARE, opacity: ACTIVE_OPACITY[d.level + 1] } }
+      : d.status === "missed"
+        ? { className: "bg-[#D9D9DE]", style: undefined }
+        : { className: "bg-white shadow-[inset_0_0_0_1px_#D1D9DE]", style: undefined };
+  return (
+    <span className="group/sq relative">
+      <span
+        tabIndex={0}
+        aria-label={label}
+        className={cn("block aspect-square rounded-[5px] outline-none focus-visible:ring-2 focus-visible:ring-[#03535F]", look.className)}
+        style={look.style}
+      />
+      <span
+        className="pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 z-10 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-black px-2 py-1 text-[10px] font-medium text-white shadow-sm group-hover/sq:block group-focus-within/sq:block"
+        aria-hidden="true"
+      >
+        {label}
+      </span>
+    </span>
+  );
+}
+
+export function SixtyDayGrid({
+  cells,
+  primary,
+  totalSubmissions,
+}: {
+  cells: ActivityCell[];
+  primary: HubEnrollment;
+  totalSubmissions: number;
+}) {
+  const byDate = new Map(cells.map((c) => [c.date, c]));
+  const todayKey = formatInTimeZone(new Date(), IST, "yyyy-MM-dd");
+  const startKey = formatInTimeZone(primary.startedAt, IST, "yyyy-MM-dd");
+  const sixty: GridDay[] = Array.from({ length: 60 }, (_, i) => {
+    const date = addCalendarDaysToKey(startKey, i);
+    const cell = byDate.get(date);
+    const count = cell?.count ?? 0;
+    const status = count > 0 ? "active" : date < todayKey ? "missed" : "future";
+    return { day: i + 1, date, count, level: cell?.level ?? 0, status };
+  });
+  const done = sixty.filter((d) => d.status === "active").length;
+  return (
+    <section aria-label="Your 60 days">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#008C94]">Your 60 days</p>
+      <p className="mt-1.5 font-heading text-[32px] font-bold leading-none text-black">
+        {done} <span className="font-medium text-[#6B7280]">of 60</span>
+      </p>
+      <p className="mt-1.5 text-sm text-[#1F1F1F]">In {TRACK_META[primary.domain].name}</p>
+
+      <div className="sixty-grid mt-4 grid max-w-[560px] gap-1.5" aria-label={`${done} of 60 days done`}>
+        {sixty.map((d) => (
+          <Square key={d.day} d={d} />
+        ))}
+      </div>
+
+      <div className="mt-3 flex max-w-[560px] flex-wrap items-center justify-between gap-2 text-xs">
+        <span className="text-[#4B4B4B]">
+          {totalSubmissions} {totalSubmissions === 1 ? "submission" : "submissions"} in the last 6 months
+        </span>
+        <span className="flex items-center gap-1.5 font-semibold text-[#4B4B4B]" aria-hidden="true">
+          Less
+          {ACTIVE_OPACITY.slice(1).map((o) => (
+            <span key={o} className="size-3 rounded-[2px]" style={{ ...ACTIVE_SQUARE, opacity: o }} />
+          ))}
+          More
+        </span>
+      </div>
+    </section>
+  );
+}
+
+/** Grid and streak in one card, side by side on wide screens. */
 export function ProgressCard({
   heatmap,
+  primary,
   streak,
 }: {
   heatmap: HeatmapData;
+  primary: HubEnrollment;
   streak: ActivityStreak;
 }) {
   return (
     <div className={cn(STAGE_CARD, "p-5")}>
       <div className="progress-split grid gap-6 md:items-start md:gap-0">
-      <section className="min-w-0 md:pr-6" aria-label="Your activity">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#008C94]">Your activity</p>
-        <p className="mt-1.5 font-heading text-[32px] font-bold leading-none text-black">
-          {heatmap.totalActiveDays}{" "}
-          <span className="font-medium text-[#6B7280]">active {heatmap.totalActiveDays === 1 ? "day" : "days"}</span>
-        </p>
-        <p className="mt-1.5 text-sm text-[#1F1F1F]">Across every track and program</p>
-        <div className="mt-3">
-          <ActivityHeatmap cells={heatmap.cells} totalSubmissions={heatmap.totalSubmissionsInWindow} embedded hideTitle />
-        </div>
-      </section>
+      <div className="md:pr-6">
+        <SixtyDayGrid cells={heatmap.cells} primary={primary} totalSubmissions={heatmap.totalSubmissionsInWindow} />
+      </div>
       <div className="border-t border-[#E9ECEC] pt-6 md:border-l md:border-t-0 md:pl-6 md:pt-0">
         <StreakBox streak={streak} />
       </div>

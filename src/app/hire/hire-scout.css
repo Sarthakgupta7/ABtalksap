@@ -9237,6 +9237,21 @@ button.hire-side__me {
   color: #18181b;
 }
 
+/* A chip the recruiter searched for. Same treatment as .desk-pill--hit on the
+   pill rows, so "this is the one you asked for" looks the same everywhere. */
+.desk-chip--hit {
+  border-color: rgba(3, 83, 95, 0.28);
+  background: var(--h-peach);
+  color: var(--h-primary);
+  font-weight: 700;
+}
+
+html.dark:not(:has(.theme-abtalks-light)) .desk-chip--hit {
+  border-color: transparent;
+  background: #A6D2D5;
+  color: #000000;
+}
+
 .desk-card__ai {
   position: relative;
   margin-top: 38px;
@@ -10311,6 +10326,21 @@ html.dark:not(:has(.theme-abtalks-light)) .hire-profile__ai-body {
   font-size: 16px;
   line-height: 24px;
   color: #18181b;
+}
+
+/* A Skill Map chip the recruiter searched for — same peach as .desk-chip--hit
+   and .desk-pill--hit, so one visual language means "you asked for this". */
+.hire-profile__chip--hit {
+  border-color: rgba(3, 83, 95, 0.28);
+  background: var(--h-peach);
+  color: var(--h-primary);
+  font-weight: 600;
+}
+
+html.dark:not(:has(.theme-abtalks-light)) .hire-profile__chip--hit {
+  border-color: transparent;
+  background: #A6D2D5;
+  color: #000000;
 }
 
 .hire-profile__count {

@@ -112,3 +112,14 @@
 /src/features/courses/                              @zainabshujat
 /src/components/course/                             @zainabshujat
 /src/components/dashboard-hub/learn-courses.tsx     @zainabshujat
+
+# ------------------------------------------------------------------------------
+# 7. Shared App Shell (plan 168)
+#
+# Navigation-feedback primitives mounted in the root layout and reused by every
+# track's nav. Changes here affect all 160 routes at once, so they route to the
+# shared-architecture owner regardless of which track prompted them.
+# ------------------------------------------------------------------------------
+/src/components/shared/route-progress.tsx           @byteninjaa0
+/src/components/shared/nav-link.tsx                 @byteninjaa0
+/src/components/shared/page-skeleton.tsx            @byteninjaa0

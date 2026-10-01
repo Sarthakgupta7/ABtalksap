@@ -47,9 +47,17 @@ export type ImportStatusView = {
 export async function loadImportStatus(input: {
   status?: ResumeImportStatus;
   cursor?: string;
+  search?: string;
+  date?: string;
 }): Promise<ImportStatusView> {
   const [list, counts, usage, workerRunning] = await Promise.all([
-    listImports({ status: input.status, cursor: input.cursor, take: 100 }),
+    listImports({
+      status: input.status,
+      cursor: input.cursor,
+      search: input.search,
+      date: input.date,
+      take: 100,
+    }),
     countImportsByStatus(),
     importUsageTotals(),
     isWorkerLeaseLive(),

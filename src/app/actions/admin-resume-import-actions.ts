@@ -300,6 +300,11 @@ export async function requestRegistrationAction(raw: unknown): Promise<Result<{ 
 const statusSchema = z.object({
   status: z.nativeEnum(ResumeImportStatus).optional(),
   cursor: z.string().max(40).optional(),
+  search: z.string().trim().max(100).optional(),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 
 export async function getImportStatusAction(raw: unknown): Promise<Result<ImportStatusView>> {

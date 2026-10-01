@@ -27,8 +27,6 @@ type ActivityHeatmapProps = {
   cells: ActivityCell[];
   totalSubmissions: number;
   embedded?: boolean;
-  /** Drop the built-in heading when the host card supplies its own. */
-  hideTitle?: boolean;
 };
 
 function formatTooltipDate(dateKey: string): string {
@@ -194,7 +192,6 @@ export function ActivityHeatmap({
   cells,
   totalSubmissions,
   embedded = false,
-  hideTitle = false,
 }: ActivityHeatmapProps) {
   const [tooltip, setTooltip] = useState<{
     count: number;
@@ -233,16 +230,14 @@ export function ActivityHeatmap({
 
   return (
     <Wrapper className={wrapperClass}>
-      {hideTitle ? null : (
-        <h2
-          className={cn(
-            "text-center font-heading font-semibold uppercase text-[#03535F]",
-            embedded ? "text-base" : "text-xl",
-          )}
-        >
-          Last {HEATMAP_MONTHS} months activity
-        </h2>
-      )}
+      <h2
+        className={cn(
+          "text-center font-heading font-semibold uppercase text-[#03535F]",
+          embedded ? "text-base" : "text-xl",
+        )}
+      >
+        Last {HEATMAP_MONTHS} months activity
+      </h2>
 
       {/* Mobile: fixed cell size + horizontal scroll with orange scrollbar */}
       <div

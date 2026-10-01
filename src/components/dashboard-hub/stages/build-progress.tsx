@@ -14,6 +14,14 @@ import "./stages.css";
 /* Progress for an enrolled student: the 60-day grid, the streak box and a
    Continue learning card. Only rendered once they have a track. */
 
+/** Per-track cover art (same images as the library tiles). */
+const TRACK_THUMB: Record<Domain, string> = {
+  SE: "/dashboard/cover-se.webp",
+  AI: "/dashboard/cover-ai.webp",
+  DS: "/dashboard/cover-ds.webp",
+  CLAUDE: "/dashboard/cover-claude.webp",
+};
+
 export const TRACK_META: Record<Domain, { name: string; blurb: string; path: string; Icon: typeof Code2 }> = {
   SE: { name: "Software Engineering", blurb: "Ship real software, one task a day", path: "/se", Icon: Code2 },
   AI: { name: "AI", blurb: "Build with models, agents and data", path: "/ai", Icon: Network },
@@ -22,8 +30,8 @@ export const TRACK_META: Record<Domain, { name: string; blurb: string; path: str
 };
 
 /* ─── Grid squares ────────────────────────────────────────────
-   The 60 days of the challenge, from its start day (IST). Each square is
-   that day's activity across every track and program, counted and shaded
+   The last 60 days (IST), ending today. Each square is that day's activity
+   across every track and program, not one domain, counted and shaded
    exactly as the activity heatmap does it.
    Active: brand teal #008C94, opacity by intensity (0.2 → 1.0), a soft
    glassy highlight plus a dark inner shadow (bottom-right) and a light one
@@ -42,10 +50,9 @@ type GridDay = { day: number; date: string; count: number; level: ActivityCell["
 
 function squareLabel(d: GridDay): string {
   const date = formatInTimeZone(parseCalendarKeyToUtcDate(d.date), IST, "d MMM");
-  if (d.status === "future") return `Day ${d.day} · ${date}`;
   return d.count === 0
-    ? `Day ${d.day} · ${date} · no submissions`
-    : `Day ${d.day} · ${date} · ${d.count} submission${d.count === 1 ? "" : "s"}`;
+    ? `${date} · no submissions`
+    : `${date} · ${d.count} submission${d.count === 1 ? "" : "s"}`;
 }
 
 function Square({ d }: { d: GridDay }) {
@@ -74,33 +81,27 @@ function Square({ d }: { d: GridDay }) {
   );
 }
 
-export function SixtyDayGrid({
-  cells,
-  primary,
-  totalSubmissions,
-}: {
-  cells: ActivityCell[];
-  primary: HubEnrollment;
-  totalSubmissions: number;
-}) {
+export function SixtyDayGrid({ cells }: { cells: ActivityCell[] }) {
   const byDate = new Map(cells.map((c) => [c.date, c]));
   const todayKey = formatInTimeZone(new Date(), IST, "yyyy-MM-dd");
-  const startKey = formatInTimeZone(primary.startedAt, IST, "yyyy-MM-dd");
+  const startKey = addCalendarDaysToKey(todayKey, -59);
   const sixty: GridDay[] = Array.from({ length: 60 }, (_, i) => {
     const date = addCalendarDaysToKey(startKey, i);
     const cell = byDate.get(date);
     const count = cell?.count ?? 0;
+    // Only today can still be "future": nothing done yet, but the day is open.
     const status = count > 0 ? "active" : date < todayKey ? "missed" : "future";
     return { day: i + 1, date, count, level: cell?.level ?? 0, status };
   });
   const done = sixty.filter((d) => d.status === "active").length;
+  const submissions = sixty.reduce((n, d) => n + d.count, 0);
   return (
-    <section aria-label="Your 60 days">
+    <section aria-label="Your last 60 days">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#008C94]">Your 60 days</p>
       <p className="mt-1.5 font-heading text-[32px] font-bold leading-none text-black">
         {done} <span className="font-medium text-[#6B7280]">of 60</span>
       </p>
-      <p className="mt-1.5 text-sm text-[#1F1F1F]">In {TRACK_META[primary.domain].name}</p>
+      <p className="mt-1.5 text-sm text-[#1F1F1F]">Active days across all your tracks</p>
 
       <div className="sixty-grid mt-4 grid max-w-[560px] gap-1.5" aria-label={`${done} of 60 days done`}>
         {sixty.map((d) => (
@@ -110,7 +111,7 @@ export function SixtyDayGrid({
 
       <div className="mt-3 flex max-w-[560px] flex-wrap items-center justify-between gap-2 text-xs">
         <span className="text-[#4B4B4B]">
-          {totalSubmissions} {totalSubmissions === 1 ? "submission" : "submissions"} in the last 6 months
+          {submissions} {submissions === 1 ? "submission" : "submissions"} in the last 60 days
         </span>
         <span className="flex items-center gap-1.5 font-semibold text-[#4B4B4B]" aria-hidden="true">
           Less
@@ -127,18 +128,16 @@ export function SixtyDayGrid({
 /** Grid and streak in one card, side by side on wide screens. */
 export function ProgressCard({
   heatmap,
-  primary,
   streak,
 }: {
   heatmap: HeatmapData;
-  primary: HubEnrollment;
   streak: ActivityStreak;
 }) {
   return (
     <div className={cn(STAGE_CARD, "p-5")}>
       <div className="progress-split grid gap-6 md:items-start md:gap-0">
       <div className="md:pr-6">
-        <SixtyDayGrid cells={heatmap.cells} primary={primary} totalSubmissions={heatmap.totalSubmissionsInWindow} />
+        <SixtyDayGrid cells={heatmap.cells} />
       </div>
       <div className="border-t border-[#E9ECEC] pt-6 md:border-l md:border-t-0 md:pl-6 md:pt-0">
         <StreakBox streak={streak} />
@@ -492,7 +491,7 @@ export function ContinueLearning({ enrollments }: { enrollments: HubEnrollment[]
                 className="group flex items-center gap-3 rounded-2xl bg-[#DCE8E9] p-2.5 text-black transition-colors hover:bg-[#D2E2E3]"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- small static thumbnail */}
-                <img src="/dashboard/track-thumb.png" alt="" className="size-[60px] shrink-0 rounded-xl object-cover" />
+                <img src={TRACK_THUMB[e.domain]} alt="" className="size-[60px] shrink-0 rounded-xl bg-white object-cover" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-heading text-[15px] font-bold leading-tight">{name}</span>
                   <span className="mt-0.5 block text-xs text-[#4B4B4B]">

@@ -110,10 +110,10 @@ suite("sign-up is reachable from the entry screen", () => {
 // 3. Both routes survive
 // =========================================================================
 
-suite("the code flow is reachable from the password screen", () => {
+suite("the code-instead link is not shown on the password screen", () => {
   assert(
-    screen.includes("Email me a 6-digit code instead"),
-    "the secondary option must be offered",
+    !screen.includes("Email me a 6-digit code instead"),
+    "OTP sign-in alternate was removed from password entry",
   );
 });
 
@@ -125,10 +125,10 @@ suite("the password flow is reachable back from the code screen", () => {
   assert(screen.includes("passwordEnabled ? ("), "and stay gated on the flag");
 });
 
-suite("the reset flow is untouched", () => {
+suite("the reset flow remains on the password screen", () => {
   assert(
     screen.includes("Email me a code to set a password"),
-    "eight of ten recruiters currently need this path",
+    "forgot/set-password path must stay reachable",
   );
 });
 

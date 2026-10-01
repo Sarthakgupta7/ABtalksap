@@ -83,12 +83,6 @@ export function SigninScreen({
     setScreen(next);
   }
 
-  function goToCodeForm() {
-    setPassword("");
-    setError(null);
-    go("email", 1);
-  }
-
   function requestCode() {
     if (emailError) {
       setShowErrors(true);
@@ -217,17 +211,6 @@ export function SigninScreen({
       </Field>
     );
   }
-
-  const codeInsteadLink = (
-    <button
-      type="button"
-      onClick={goToCodeForm}
-      disabled={pending}
-      className={TEXT_LINK}
-    >
-      Email me a 6-digit code instead
-    </button>
-  );
 
   return (
     <OnboardingShell
@@ -359,7 +342,6 @@ export function SigninScreen({
               }
               footer={
                 <div className="space-y-2">
-                  <p>{codeInsteadLink}</p>
                   <p>
                     Forgot it, or never set one?{" "}
                     <button
@@ -403,10 +385,6 @@ export function SigninScreen({
                 </Field>
                 {passwordField("si-password", "current-password", "Password")}
                 <FieldError message={error} />
-                {/* Plan 166 §2b: after a failed password attempt, surface the
-                    code route next to the generic error — affordance, not
-                    disclosure of whether a password exists. */}
-                {error ? <p className="text-sm">{codeInsteadLink}</p> : null}
               </StaggerItem>
             </OnboardingStep>
           ) : screen === "reset" ? (
